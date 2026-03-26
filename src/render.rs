@@ -133,34 +133,60 @@ impl Renderer {
     
     fn render_class(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
         let mut output = String::new();
-        
+
         for node in &diagram.nodes {
             if let Some(_pos) = layout.positions.get(&node.id) {
-                // Draw class box
-                output.push_str(&"┌".to_string());
-                output.push_str(&"─".repeat(16));
-                output.push_str(&"┐".to_string());
-                output.push('\n');
+                // Calculate box width based on content
+                let mut max_width = node.get_label().len();
+                for member in &node.members {
+                    let prefix = match member.visibility {
+                        crate::diagram::Visibility::Public => "+",
+                        crate::diagram::Visibility::Private => "-",
+                        crate::diagram::Visibility::Protected => "#",
+                        crate::diagram::Visibility::Package => "~",
+                    };
+                    let member_str = format!("{} {}", prefix, member.name);
+                    max_width = max_width.max(member_str.len());
+                }
+                let box_width = max_width.max(16).min(40);
+
+                // Draw class box top
+                output.push('┌');
+                output.push_str(&"─".repeat(box_width));
+                output.push_str("┐\n");
                 
-                // Class name
-                output.push_str(&"│");
-                output.push_str(&format!("{:^16}", node.get_label()));
-                output.push_str(&"│");
-                output.push('\n');
+                // Class name (centered)
+                output.push('│');
+                output.push_str(&format!("{:^width$}", node.get_label(), width = box_width));
+                output.push_str("│\n");
                 
                 // Divider
-                output.push_str(&"├".to_string());
-                output.push_str(&"─".repeat(16));
-                output.push_str(&"┤");
-                output.push('\n');
+                output.push('├');
+                output.push_str(&"─".repeat(box_width));
+                output.push_str("┤\n");
                 
-                // Empty body (simplified)
-                output.push_str(&"│".repeat(17));
-                output.push('\n');
-                output.push_str(&"└".to_string());
-                output.push_str(&"─".repeat(16));
-                output.push_str(&"┘".to_string());
-                output.push('\n');
+                // Members
+                for member in &node.members {
+                    let prefix = match member.visibility {
+                        crate::diagram::Visibility::Public => "+",
+                        crate::diagram::Visibility::Private => "-",
+                        crate::diagram::Visibility::Protected => "#",
+                        crate::diagram::Visibility::Package => "~",
+                    };
+                    let symbol = match member.member_type {
+                        crate::diagram::MemberType::Field => ":",
+                        crate::diagram::MemberType::Method => "()",
+                    };
+                    let member_str = format!("{} {}{}", prefix, member.name, symbol);
+                    output.push('│');
+                    output.push_str(&format!("{:<width$}", member_str, width = box_width));
+                    output.push_str("│\n");
+                }
+                
+                // Bottom
+                output.push('└');
+                output.push_str(&"─".repeat(box_width));
+                output.push_str("┘\n");
                 output.push('\n');
             }
         }
@@ -171,6 +197,9 @@ impl Renderer {
                 "<|--" => "◄───",
                 "*--" => "●───",
                 "o--" => "○───",
+                "--|>" => "───►",
+                "..>" => "····▶",
+                "..|>" => "····►",
                 _ => "───",
             };
             output.push_str(&format!("{} {}\n", rel.from, arrow));

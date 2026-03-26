@@ -1,6 +1,6 @@
 //! Mermaid syntax parser
 
-use crate::diagram::{Diagram, DiagramType, Edge, EdgeStyle, Node, Relationship};
+use crate::diagram::{ClassMember, Diagram, DiagramType, Edge, EdgeStyle, MemberType, Node, Relationship, Visibility};
 
 /// Parse Mermaid source code into a Diagram
 pub fn parse_mermaid(source: &str) -> anyhow::Result<Diagram> {
@@ -218,10 +218,18 @@ fn parse_class(source: &str) -> anyhow::Result<Diagram> {
     let mut nodes: std::collections::HashMap<String, Node> = std::collections::HashMap::new();
     let mut relationships: Vec<Relationship> = Vec::new();
     
+    // Join all lines for multi-line class body parsing
+    let source_joined = source.replace("\n", " ");
+    
     for line in source.lines() {
         let line = line.trim();
         
-        // Parse class definition
+        // Skip comments and empty lines
+        if line.starts_with("%%") || line.is_empty() {
+            continue;
+        }
+        
+        // Parse class definition with members (single or multi-line)
         if line.starts_with("class") && line.contains("{") {
             let class_name = line
                 .split_whitespace()
@@ -230,7 +238,27 @@ fn parse_class(source: &str) -> anyhow::Result<Diagram> {
                 .trim();
             
             if !class_name.is_empty() {
-                nodes.insert(class_name.to_string(), Node::new(class_name, class_name));
+                // Check if it's a multi-line class (body ends on next line)
+                if line.matches('{').count() == line.matches('}').count() {
+                    // Single line class
+                    let members = parse_class_members(line);
+                    let mut node = Node::new(class_name, class_name);
+                    node.members = members;
+                    nodes.insert(class_name.to_string(), node);
+                } else {
+                    // Multi-line: need to find the closing brace in subsequent lines
+                    let rest_lines: Vec<&str> = source.lines()
+                        .skip_while(|l| !l.contains(class_name))
+                        .skip(1)
+                        .collect();
+                    let rest = rest_lines.join(" ");
+                    
+                    let full_def = format!("{} {}", line, rest);
+                    let members = parse_class_members(&full_def);
+                    let mut node = Node::new(class_name, class_name);
+                    node.members = members;
+                    nodes.insert(class_name.to_string(), node);
+                }
             }
         }
         
@@ -276,6 +304,79 @@ fn parse_class(source: &str) -> anyhow::Result<Diagram> {
     diagram.relationships = relationships;
     
     Ok(diagram)
+}
+
+/// Parse class members from class definition body
+fn parse_class_members(class_def: &str) -> Vec<ClassMember> {
+    let mut members = Vec::new();
+    
+    // Find the body between { and }
+    if let Some(start) = class_def.find('{') {
+        let rest = &class_def[start+1..];
+        // Find the matching closing brace
+        let mut depth = 1;
+        let mut end = 0;
+        for (i, c) in rest.chars().enumerate() {
+            if c == '{' { depth += 1; }
+            if c == '}' { depth -= 1; }
+            if depth == 0 {
+                end = i;
+                break;
+            }
+        }
+        
+        if end > 0 {
+            let body = &rest[..end];
+            
+            // Split by } or { to get individual members
+            for line in body.split(&['}', '{'][..]) {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                
+                let visibility = if line.starts_with('+') {
+                    Visibility::Public
+                } else if line.starts_with('-') {
+                    Visibility::Private
+                } else if line.starts_with('#') {
+                    Visibility::Protected
+                } else if line.starts_with('~') {
+                    Visibility::Package
+                } else {
+                    Visibility::Public
+                };
+                
+                let line = line.trim_start_matches(&['+', '-', '#', '~'][..]);
+                
+                // Determine if field or method
+                let member_type = if line.contains('(') && line.contains(')') {
+                    MemberType::Method
+                } else {
+                    MemberType::Field
+                };
+                
+                // Extract name
+                let name = if member_type == MemberType::Method {
+                    line.split('(').next().unwrap_or(line).trim().to_string()
+                } else if line.contains(':') {
+                    line.split(':').next().unwrap_or(line).trim().to_string()
+                } else {
+                    line.trim().to_string()
+                };
+                
+                if !name.is_empty() {
+                    members.push(ClassMember {
+                        name,
+                        member_type,
+                        visibility,
+                    });
+                }
+            }
+        }
+    }
+    
+    members
 }
 
 fn parse_state(source: &str) -> anyhow::Result<Diagram> {

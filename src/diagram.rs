@@ -53,6 +53,29 @@ pub struct Node {
     pub shape: NodeShape,
     pub style: Option<String>,
     pub class: Option<String>,
+    pub members: Vec<ClassMember>,
+}
+
+/// Class member (field or method)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassMember {
+    pub name: String,
+    pub member_type: MemberType,
+    pub visibility: Visibility,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MemberType {
+    Field,
+    Method,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Visibility {
+    Public,    // +
+    Private,   // -
+    Protected, // #
+    Package,   // ~
 }
 
 /// An edge connecting nodes
@@ -104,6 +127,7 @@ impl Node {
             shape: NodeShape::Rectangle,
             style: None,
             class: None,
+            members: Vec::new(),
         }
     }
 }
