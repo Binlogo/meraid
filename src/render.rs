@@ -293,26 +293,107 @@ impl Renderer {
         }
     }
     
-    fn draw_edge(&self, canvas: &mut Vec<Vec<char>>, from: &Position, to: &Position, _label: Option<&str>) {
-        // Simple horizontal/vertical edge routing
+    fn draw_edge(&self, canvas: &mut Vec<Vec<char>>, from: &Position, to: &Position, label: Option<&str>) {
+        // Manhattan-style edge routing (horizontal then vertical, or vice versa)
         let from_x = from.x + from.width;
         let from_y = from.y + from.height / 2;
         let to_x = to.x;
-        let _to_y = to.y + to.height / 2;
+        let to_y = to.y + to.height / 2;
         
-        // Horizontal line
-        let start_x = from_x.min(to_x);
-        let end_x = from_x.max(to_x);
+        // Determine routing direction based on relative positions
+        let dy = if to_y > from_y { to_y - from_y } else { from_y - to_y };
+        let dx = if to_x > from_x { to_x - from_x } else { from_x - to_x };
+        let (mid_x, mid_y, vertical_first) = if dy > dx {
+            // Vertical distance is greater, route vertically first
+            (from_x, to_y, true)
+        } else {
+            // Route horizontally first (default)
+            (to_x, from_y, false)
+        };
         
-        for x in (start_x + 1)..end_x {
-            if x < canvas[0].len() && from_y < canvas.len() {
-                canvas[from_y][x] = if self.ascii_only { '-' } else { '─' };
+        if vertical_first {
+            // Vertical segment first, then horizontal
+            // From -> mid point (vertical)
+            let vert_start = from_y.min(mid_y);
+            let vert_end = from_y.max(mid_y);
+            for y in (vert_start + 1)..vert_end {
+                if y < canvas.len() && from_x < canvas[0].len() {
+                    canvas[y][from_x] = if self.ascii_only { '|' } else { '│' };
+                }
+            }
+            
+            // Horizontal segment
+            let horiz_start = from_x.min(to_x);
+            let horiz_end = from_x.max(to_x);
+            for x in (horiz_start + 1)..horiz_end {
+                if mid_y < canvas.len() && x < canvas[0].len() {
+                    canvas[mid_y][x] = if self.ascii_only { '-' } else { '─' };
+                }
+            }
+            
+            // Vertical segment to target (mid_y -> to_y)
+            let vert_start = mid_y.min(to_y);
+            let vert_end = mid_y.max(to_y);
+            for y in (vert_start + 1)..vert_end {
+                if y < canvas.len() && to_x < canvas[0].len() {
+                    canvas[y][to_x] = if self.ascii_only { '|' } else { '│' };
+                }
+            }
+        } else {
+            // Horizontal first, then vertical
+            // From -> mid point (horizontal)
+            let horiz_start = from_x.min(mid_x);
+            let horiz_end = from_x.max(mid_x);
+            for x in (horiz_start + 1)..horiz_end {
+                if from_y < canvas.len() && x < canvas[0].len() {
+                    canvas[from_y][x] = if self.ascii_only { '-' } else { '─' };
+                }
+            }
+            
+            // Vertical segment
+            let vert_start = from_y.min(to_y);
+            let vert_end = from_y.max(to_y);
+            for y in (vert_start + 1)..vert_end {
+                if y < canvas.len() && mid_x < canvas[0].len() {
+                    canvas[y][mid_x] = if self.ascii_only { '|' } else { '│' };
+                }
+            }
+            
+            // Horizontal segment to target (mid_x -> to_x)
+            let horiz_start = mid_x.min(to_x);
+            let horiz_end = mid_x.max(to_x);
+            for x in (horiz_start + 1)..horiz_end {
+                if to_y < canvas.len() && x < canvas[0].len() {
+                    canvas[to_y][x] = if self.ascii_only { '-' } else { '─' };
+                }
             }
         }
         
-        // Arrow
-        if to_x > from_x && to_x - 1 < canvas[0].len() && from_y < canvas.len() {
-            canvas[from_y][to_x - 1] = if self.ascii_only { '>' } else { '▶' };
+        // Draw arrow head at destination
+        if to_x > from_x {
+            // Arrow pointing right
+            if to_y < canvas.len() && to_x > 0 && to_x < canvas[0].len() {
+                canvas[to_y][to_x - 1] = if self.ascii_only { '>' } else { '▶' };
+            }
+        } else if to_x < from_x {
+            // Arrow pointing left
+            if to_y < canvas.len() && to_x + 1 < canvas[0].len() {
+                canvas[to_y][to_x + 1] = if self.ascii_only { '<' } else { '◀' };
+            }
+        }
+        
+        // Draw edge label if present
+        if let Some(label_text) = label {
+            let label_x = (from_x + to_x) / 2;
+            let label_y = if vertical_first { mid_y } else { (from_y + to_y) / 2 };
+            if label_y < canvas.len() {
+                let padded = self.pad_string(label_text, 8);
+                for (i, ch) in padded.chars().enumerate() {
+                    if label_x + i < canvas[0].len() {
+                        canvas[label_y][label_x + i] = ch;
+                    }
+                }
+            }
         }
     }
     
