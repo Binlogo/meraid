@@ -165,22 +165,28 @@ impl Renderer {
                 output.push_str(&"─".repeat(box_width));
                 output.push_str("┤\n");
                 
-                // Members
-                for member in &node.members {
-                    let prefix = match member.visibility {
-                        crate::diagram::Visibility::Public => "+",
-                        crate::diagram::Visibility::Private => "-",
-                        crate::diagram::Visibility::Protected => "#",
-                        crate::diagram::Visibility::Package => "~",
-                    };
-                    let symbol = match member.member_type {
-                        crate::diagram::MemberType::Field => ":",
-                        crate::diagram::MemberType::Method => "()",
-                    };
-                    let member_str = format!("{} {}{}", prefix, member.name, symbol);
+                // Members - each on separate line
+                if node.members.is_empty() {
                     output.push('│');
-                    output.push_str(&format!("{:<width$}", member_str, width = box_width));
+                    output.push_str(&" ".repeat(box_width));
                     output.push_str("│\n");
+                } else {
+                    for member in &node.members {
+                        let prefix = match member.visibility {
+                            crate::diagram::Visibility::Public => "+",
+                            crate::diagram::Visibility::Private => "-",
+                            crate::diagram::Visibility::Protected => "#",
+                            crate::diagram::Visibility::Package => "~",
+                        };
+                        let suffix = match member.member_type {
+                            crate::diagram::MemberType::Field => "",
+                            crate::diagram::MemberType::Method => "()",
+                        };
+                        let member_str = format!("{}{}{}", prefix, member.name, suffix);
+                        output.push('│');
+                        output.push_str(&format!("{:<width$}", member_str, width = box_width));
+                        output.push_str("│\n");
+                    }
                 }
                 
                 // Bottom

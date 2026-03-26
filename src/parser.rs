@@ -1,6 +1,6 @@
 //! Mermaid syntax parser
 
-use crate::diagram::{ClassMember, Diagram, DiagramType, Edge, EdgeStyle, MemberType, Node, Relationship, Visibility};
+use crate::diagram::{ClassMember, Diagram, DiagramType, Edge, EdgeStyle, Entity, EntityAttribute, MemberType, Node, Relationship, Visibility};
 
 /// Parse Mermaid source code into a Diagram
 pub fn parse_mermaid(source: &str) -> anyhow::Result<Diagram> {
@@ -427,21 +427,45 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
     diagram.diagram_type = DiagramType::ER;
     
     let mut relationships: Vec<Relationship> = Vec::new();
+    let mut entities: Vec<Entity> = Vec::new();
     
     for line in source.lines() {
         let line = line.trim();
         
+        // Skip comments and keywords
+        if line.starts_with("%%") || line.starts_with("erDiagram") || line.is_empty() {
+            continue;
+        }
+        
+        // Parse entity definition: EntityName { ... }
+        if line.contains("{") && line.contains("}") {
+            let entity_name = line.split('{').next().unwrap_or("").trim();
+            if !entity_name.is_empty() {
+                let attributes = parse_er_attributes(line);
+                entities.push(Entity {
+                    name: entity_name.to_string(),
+                    attributes,
+                });
+            }
+        }
+        
+        // Parse relationships
         if line.contains("--") {
-            let parts: Vec<&str> = line.split(':').collect();
-            let rel_part = parts[0].trim();
-            
             let rel_types = ["||--", "}|--", "||--", "o{--", "}o--", "o|--"];
             for rel_type in rel_types {
-                if rel_part.contains(rel_type) {
-                    let entities: Vec<&str> = rel_part.split(rel_type).collect();
-                    if entities.len() == 2 {
-                        let from = entities[0].trim();
-                        let to = entities[1].trim();
+                if line.contains(rel_type) {
+                    let parts: Vec<&str> = line.split(rel_type).collect();
+                    if parts.len() == 2 {
+                        let from = parts[0].trim();
+                        let to = parts[1].trim();
+                        
+                        // Extract relationship label if present
+                        let rel_label = if line.contains(':') {
+                            let label_parts: Vec<&str> = line.split(':').collect();
+                            Some(label_parts.get(1).map(|s| s.trim()).unwrap_or("").to_string())
+                        } else {
+                            None
+                        };
                         
                         relationships.push(Relationship {
                             from: from.to_string(),
@@ -449,16 +473,60 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
                             rel_type: rel_type.to_string(),
                         });
                         
-                        diagram.nodes.push(Node::new(from, from));
-                        diagram.nodes.push(Node::new(to, to));
+                        // Ensure entities exist
+                        if !from.is_empty() {
+                            diagram.nodes.push(Node::new(from, from));
+                        }
+                        if !to.is_empty() {
+                            diagram.nodes.push(Node::new(to, to));
+                        }
                     }
                 }
             }
         }
     }
     
+    diagram.entities = entities;
     diagram.relationships = relationships;
     Ok(diagram)
+}
+
+/// Parse ER entity attributes
+fn parse_er_attributes(entity_def: &str) -> Vec<EntityAttribute> {
+    let mut attrs = Vec::new();
+    
+    if let Some(start) = entity_def.find('{') {
+        if let Some(end) = entity_def.find('}') {
+            let body = &entity_def[start+1..end];
+            
+            for line in body.lines() {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                
+                let is_pk = line.starts_with("*") || line.contains(" PK");
+                let is_fk = line.starts_with("+") || line.contains(" FK");
+                
+                let line = line.trim_start_matches(&['*', '+'][..]);
+                
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if !parts.is_empty() {
+                    let name = parts[0].to_string();
+                    let attr_type = parts.get(1).unwrap_or(&"string").to_string();
+                    
+                    attrs.push(EntityAttribute {
+                        name,
+                        attr_type,
+                        is_primary_key: is_pk,
+                        is_foreign_key: is_fk,
+                    });
+                }
+            }
+        }
+    }
+    
+    attrs
 }
 
 fn parse_pie(source: &str) -> anyhow::Result<Diagram> {

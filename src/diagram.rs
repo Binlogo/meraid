@@ -96,6 +96,7 @@ pub struct Diagram {
     pub edges: Vec<Edge>,
     pub relationships: Vec<Relationship>,
     pub participants: Vec<String>,
+    pub entities: Vec<Entity>,
 }
 
 impl Default for Diagram {
@@ -107,8 +108,25 @@ impl Default for Diagram {
             edges: Vec::new(),
             relationships: Vec::new(),
             participants: Vec::new(),
+            entities: Vec::new(),
         }
     }
+}
+
+/// ER Diagram entity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Entity {
+    pub name: String,
+    pub attributes: Vec<EntityAttribute>,
+}
+
+/// ER Diagram attribute
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityAttribute {
+    pub name: String,
+    pub attr_type: String,
+    pub is_primary_key: bool,
+    pub is_foreign_key: bool,
 }
 
 /// Class diagram relationship
