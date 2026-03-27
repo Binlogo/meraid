@@ -1,41 +1,15 @@
 //! Terminal renderer for diagrams
 
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
 use crate::diagram::{Diagram, DiagramType, EdgeStyle, Entity, Node};
 use crate::layout::{LayoutResult, Position};
 use crate::theme::Theme;
 
-/// Calculate the display width of a string in a terminal.
-/// - ASCII characters: 1 cell width
-/// - CJK (Chinese, Japanese, Korean): 2 cell widths
-/// - Other wide characters: 2 cell widths
-/// - Control characters: 0 cell width
+/// Calculate the display width of a string in a terminal using Unicode width.
+/// This properly handles CJK characters (2 cells) and ASCII (1 cell).
 fn str_width(s: &str) -> usize {
-    s.chars().map(|c| {
-        if c.is_ascii() {
-            1
-        } else if is_cjk(c) {
-            2
-        } else if c.is_whitespace() {
-            1
-        } else {
-            // Default for other characters
-            2
-        }
-    }).sum()
-}
-
-/// Check if a character is CJK (Chinese, Japanese, Korean)
-fn is_cjk(c: char) -> bool {
-    matches!(c,
-        '\u{4E00}'..='\u{9FFF}' |  // CJK Unified Ideographs
-        '\u{3400}'..='\u{4DBF}' |  // CJK Unified Ideographs Extension A
-        '\u{F900}'..='\u{FAFF}' |  // CJK Compatibility Ideographs
-        '\u{3000}'..='\u{303F}' |  // CJK Symbols and Punctuation
-        '\u{FF00}'..='\u{FFEF}' |  // Fullwidth Forms
-        '\u{3040}'..='\u{309F}' |  // Hiragana
-        '\u{30A0}'..='\u{30FF}' |  // Katakana
-        '\u{AC00}'..='\u{D7AF}'    // Hangul Syllables
-    )
+    UnicodeWidthStr::width(s)
 }
 
 /// Renderer for terminal output
@@ -551,7 +525,7 @@ impl Renderer {
             let mut result = String::new();
             let mut current_width = 0;
             for c in s.chars() {
-                let c_width = if c.is_ascii() { 1 } else if is_cjk(c) { 2 } else { 1 };
+                let c_width = UnicodeWidthChar::width(c).unwrap_or(1);
                 if current_width + c_width > width {
                     break;
                 }
