@@ -81,7 +81,7 @@ impl<'a> Layout<'a> {
         // Assign positions based on distance (layer)
         let mut layer_nodes: std::collections::HashMap<usize, Vec<String>> = std::collections::HashMap::new();
         for (node_id, dist) in &distances {
-            layer_nodes.entry(*dist).or_insert_with(Vec::new).push(node_id.clone());
+            layer_nodes.entry(*dist).or_default().push(node_id.clone());
         }
         
         // Position nodes

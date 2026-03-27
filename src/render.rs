@@ -5,6 +5,7 @@ use crate::layout::{LayoutResult, Position};
 use crate::theme::Theme;
 
 /// Renderer for terminal output
+#[allow(dead_code)]
 pub struct Renderer {
     theme: Theme,
     ascii_only: bool,
@@ -111,14 +112,22 @@ impl Renderer {
             let from_idx = diagram.participants.iter().position(|p| p == &edge.from).unwrap_or(0);
             let to_idx = diagram.participants.iter().position(|p| p == &edge.to).unwrap_or(0);
             
-            let arrow_str = if edge.style == EdgeStyle::Solid { "──▶" } else { "──▶" };
+            let arrow_str = match edge.style {
+                EdgeStyle::Solid => "──▶",
+                EdgeStyle::Dotted => "┄┄▶",
+                _ => "──▶",
+            };
             
             if from_idx < to_idx {
                 // Left to right
                 output.push_str(&format!("{:>width$}", format!("──{}", arrow_str), width = from_idx * (participant_width + 2) + participant_width / 2));
             } else {
                 // Right to left
-                let reverse_arrow = if edge.style == EdgeStyle::Solid { "◀──" } else { "◀──" };
+                let reverse_arrow = match edge.style {
+                    EdgeStyle::Solid => "◀──",
+                    EdgeStyle::Dotted => "◀┄┄",
+                    _ => "◀──",
+                };
                 output.push_str(&format!("{:width$}", format!("{}{}", reverse_arrow, arrow_str), width = to_idx * (participant_width + 2) + participant_width / 2));
             }
             
@@ -149,7 +158,7 @@ impl Renderer {
                     let member_str = format!("{} {}", prefix, member.name);
                     max_width = max_width.max(member_str.len());
                 }
-                let box_width = max_width.max(16).min(40);
+                let box_width = max_width.clamp(16, 40);
 
                 // Draw class box top
                 output.push('┌');
@@ -255,14 +264,14 @@ impl Renderer {
         
         for node in &diagram.nodes {
             let parts: Vec<&str> = node.label.split(':').collect();
-            let label_str = parts.get(0).map(|s| *s).unwrap_or("");
+            let label_str = parts.first().copied().unwrap_or("");
             let value: f64 = parts.get(1).and_then(|s| s.trim().parse::<f64>().ok()).unwrap_or(0.0);
             
             let percentage = value / total;
             let bar_chars = (percentage * max_bar_width as f64) as usize;
             
             output.push_str(label_str);
-            output.push_str("┃");
+            output.push('┃');
             output.push_str(&"█".repeat(bar_chars));
             output.push_str(&format!(" {:.1}%\n", percentage * 100.0));
         }
@@ -341,7 +350,7 @@ impl Renderer {
             );
             max_width = max_width.max(attr_str.len());
         }
-        max_width.max(20).min(50)
+        max_width.clamp(20, 50)
     }
     
     fn draw_node(&self, canvas: &mut Vec<Vec<char>>, pos: &Position, label: &str) {
@@ -365,8 +374,8 @@ impl Renderer {
         // Top border
         if px + w < canvas[0].len() {
             canvas[py][px] = chars.top_left;
-            for x in (px + 1)..(px + w - 1) {
-                canvas[py][x] = chars.horizontal;
+            for _x in (px + 1)..(px + w - 1) {
+                canvas[py][_x] = chars.horizontal;
             }
             canvas[py][px + w - 1] = chars.top_right;
         }
@@ -374,8 +383,8 @@ impl Renderer {
         // Bottom border
         if py + h < canvas.len() && px + w < canvas[0].len() {
             canvas[py + h][px] = chars.bottom_left;
-            for x in (px + 1)..(px + w - 1) {
-                canvas[py + h][x] = chars.horizontal;
+            for _x in (px + 1)..(px + w - 1) {
+                canvas[py + h][_x] = chars.horizontal;
             }
             canvas[py + h][px + w - 1] = chars.bottom_right;
         }
@@ -403,7 +412,7 @@ impl Renderer {
         }
     }
     
-    fn draw_edge(&self, canvas: &mut Vec<Vec<char>>, from: &Position, to: &Position, label: Option<&str>) {
+    fn draw_edge(&self, canvas: &mut [Vec<char>], from: &Position, to: &Position, label: Option<&str>) {
         // Manhattan-style edge routing (horizontal then vertical, or vice versa)
         let from_x = from.x + from.width;
         let from_y = from.y + from.height / 2;
@@ -411,8 +420,8 @@ impl Renderer {
         let to_y = to.y + to.height / 2;
         
         // Determine routing direction based on relative positions
-        let dy = if to_y > from_y { to_y - from_y } else { from_y - to_y };
-        let dx = if to_x > from_x { to_x - from_x } else { from_x - to_x };
+        let dy = to_y.abs_diff(from_y);
+        let dx = to_x.abs_diff(from_x);
         let (mid_x, mid_y, vertical_first) = if dy > dx {
             // Vertical distance is greater, route vertically first
             (from_x, to_y, true)

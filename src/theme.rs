@@ -21,7 +21,7 @@ impl Color {
             let gray = self.r;
             if gray < 8 { return 16; }
             if gray > 248 { return 231; }
-            return (((gray - 8) / 247) * 24 + 232) as u8;
+            return ((gray - 8) / 247) * 24 + 232;
         }
         
         let r = (self.r as f32 / 255.0 * 5.0) as u8;

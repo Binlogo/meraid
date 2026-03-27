@@ -48,8 +48,10 @@ fn detect_diagram_type(source: &str) -> DiagramType {
 }
 
 fn parse_flowchart(source: &str) -> anyhow::Result<Diagram> {
-    let mut diagram = Diagram::default();
-    diagram.diagram_type = DiagramType::Flowchart;
+    let mut diagram = Diagram {
+        diagram_type: DiagramType::Flowchart,
+        ..Default::default()
+    };
     
     // Parse direction
     for line in source.lines() {
@@ -155,8 +157,10 @@ fn parse_flowchart_edge(line: &str, nodes: &mut std::collections::HashMap<String
 }
 
 fn parse_sequence(source: &str) -> anyhow::Result<Diagram> {
-    let mut diagram = Diagram::default();
-    diagram.diagram_type = DiagramType::Sequence;
+    let mut diagram = Diagram {
+        diagram_type: DiagramType::Sequence,
+        ..Default::default()
+    };
     
     for line in source.lines() {
         let line = line.trim();
@@ -213,14 +217,16 @@ fn parse_sequence(source: &str) -> anyhow::Result<Diagram> {
 }
 
 fn parse_class(source: &str) -> anyhow::Result<Diagram> {
-    let mut diagram = Diagram::default();
-    diagram.diagram_type = DiagramType::Class;
+    let mut diagram = Diagram {
+        diagram_type: DiagramType::Class,
+        ..Default::default()
+    };
     
     let mut nodes: std::collections::HashMap<String, Node> = std::collections::HashMap::new();
     let mut relationships: Vec<Relationship> = Vec::new();
     
     // Join all lines for multi-line class body parsing
-    let source_joined = source.replace("\n", " ");
+    let _source_joined = source.replace("\n", " ");
     
     for line in source.lines() {
         let line = line.trim();
@@ -381,8 +387,10 @@ fn parse_class_members(class_def: &str) -> Vec<ClassMember> {
 }
 
 fn parse_state(source: &str) -> anyhow::Result<Diagram> {
-    let mut diagram = Diagram::default();
-    diagram.diagram_type = DiagramType::State;
+    let mut diagram = Diagram {
+        diagram_type: DiagramType::State,
+        ..Default::default()
+    };
     
     for line in source.lines() {
         let line = line.trim();
@@ -424,7 +432,10 @@ fn parse_state(source: &str) -> anyhow::Result<Diagram> {
 }
 
 fn parse_er(source: &str) -> anyhow::Result<Diagram> {
-    let mut diagram = Diagram::default();
+    let mut diagram = Diagram {
+        diagram_type: DiagramType::ER,
+        ..Default::default()
+    };
     diagram.diagram_type = DiagramType::ER;
     
     let mut relationships: Vec<Relationship> = Vec::new();
@@ -526,8 +537,10 @@ fn parse_er_body(entity_def: &str) -> Vec<EntityAttribute> {
 }
 
 fn parse_pie(source: &str) -> anyhow::Result<Diagram> {
-    let mut diagram = Diagram::default();
-    diagram.diagram_type = DiagramType::Pie;
+    let mut diagram = Diagram {
+        diagram_type: DiagramType::Pie,
+        ..Default::default()
+    };
     
     for line in source.lines() {
         let line = line.trim();
