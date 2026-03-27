@@ -1,5 +1,6 @@
 //! Mermaid syntax parser
 
+use regex::Regex;
 use crate::diagram::{ClassMember, Diagram, DiagramType, Edge, EdgeStyle, Entity, EntityAttribute, MemberType, Node, Relationship, Visibility};
 
 /// Parse Mermaid source code into a Diagram
@@ -429,38 +430,40 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
     let mut relationships: Vec<Relationship> = Vec::new();
     let mut entities: Vec<Entity> = Vec::new();
     
+    // Extract entity definitions using regex: WORD { ... }
+    let entity_regex = Regex::new(r"(\w+)\s*\{([^}]*)\}").unwrap();
+    for cap in entity_regex.captures_iter(source) {
+        let name = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+        let body = cap.get(2).map(|m| m.as_str()).unwrap_or("");
+        
+        if !name.is_empty() {
+            let attributes = parse_er_body(body);
+            entities.push(Entity {
+                name: name.to_string(),
+                attributes,
+            });
+        }
+    }
+    
+    // Extract relationships
+    let rel_types = ["||--", "}|--", "}o--", "o{--", "o|--", "||-|"];
     for line in source.lines() {
         let line = line.trim();
         
-        // Skip comments and keywords
         if line.starts_with("%%") || line.starts_with("erDiagram") || line.is_empty() {
             continue;
         }
         
-        // Parse entity definition: EntityName { ... }
-        if line.contains("{") && line.contains("}") {
-            let entity_name = line.split('{').next().unwrap_or("").trim();
-            if !entity_name.is_empty() {
-                let attributes = parse_er_attributes(line);
-                entities.push(Entity {
-                    name: entity_name.to_string(),
-                    attributes,
-                });
-            }
-        }
-        
-        // Parse relationships
-        if line.contains("--") {
-            let rel_types = ["||--", "}|--", "||--", "o{--", "}o--", "o|--"];
-            for rel_type in rel_types {
-                if line.contains(rel_type) {
-                    let parts: Vec<&str> = line.split(rel_type).collect();
-                    if parts.len() == 2 {
-                        let from = parts[0].trim();
-                        let to = parts[1].trim();
-                        
-                        // Extract relationship label if present
-                        let rel_label = if line.contains(':') {
+        for rel_type in rel_types {
+            if line.contains(rel_type) {
+                let parts: Vec<&str> = line.split(rel_type).collect();
+                if parts.len() == 2 {
+                    let from = parts[0].trim();
+                    let to = parts[1].trim();
+                    
+                    // Skip if it contains braces (part of entity definition)
+                    if !from.is_empty() && !to.is_empty() && !from.contains('{') && !to.contains('}') {
+                        let _rel_label = if line.contains(':') {
                             let label_parts: Vec<&str> = line.split(':').collect();
                             Some(label_parts.get(1).map(|s| s.trim()).unwrap_or("").to_string())
                         } else {
@@ -472,14 +475,6 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
                             to: to.to_string(),
                             rel_type: rel_type.to_string(),
                         });
-                        
-                        // Ensure entities exist
-                        if !from.is_empty() {
-                            diagram.nodes.push(Node::new(from, from));
-                        }
-                        if !to.is_empty() {
-                            diagram.nodes.push(Node::new(to, to));
-                        }
                     }
                 }
             }
@@ -491,8 +486,9 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
     Ok(diagram)
 }
 
-/// Parse ER entity attributes
-fn parse_er_attributes(entity_def: &str) -> Vec<EntityAttribute> {
+
+
+fn parse_er_body(entity_def: &str) -> Vec<EntityAttribute> {
     let mut attrs = Vec::new();
     
     if let Some(start) = entity_def.find('{') {

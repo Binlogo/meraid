@@ -1,6 +1,6 @@
 //! Terminal renderer for diagrams
 
-use crate::diagram::{Diagram, DiagramType, EdgeStyle, Node};
+use crate::diagram::{Diagram, DiagramType, EdgeStyle, Entity, Node};
 use crate::layout::{LayoutResult, Position};
 use crate::theme::Theme;
 
@@ -41,6 +41,7 @@ impl Renderer {
             DiagramType::Class => self.render_class(diagram, layout),
             DiagramType::State => self.render_state(diagram, layout),
             DiagramType::Pie => self.render_pie(diagram, layout),
+            DiagramType::ER => self.render_er(diagram, layout),
             _ => self.render_flowchart(diagram, layout),
         }
     }
@@ -267,6 +268,80 @@ impl Renderer {
         }
         
         output
+    }
+
+    fn render_er(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
+        let mut output = String::new();
+        
+        // Debug: print entities
+        eprintln!("DEBUG: {} entities found", diagram.entities.len());
+        for e in &diagram.entities {
+            eprintln!("  Entity: {} attrs: {:?}", e.name, e.attributes.len());
+        }
+        
+        // Render entities
+        for entity in &diagram.entities {
+            let box_width = self.calculate_er_box_width(entity);
+            
+            // Top border
+            output.push('┌');
+            output.push_str(&"─".repeat(box_width));
+            output.push_str("┐\n");
+            
+            // Entity name (centered)
+            output.push('│');
+            output.push_str(&format!("{:^width$}", entity.name, width = box_width));
+            output.push_str("│\n");
+            
+            // Divider
+            output.push('├');
+            output.push_str(&"─".repeat(box_width));
+            output.push_str("┤\n");
+            
+            // Attributes
+            for attr in &entity.attributes {
+                let pk_marker = if attr.is_primary_key { "PK" } else { "  " };
+                let fk_marker = if attr.is_foreign_key { "FK" } else { "  " };
+                let attr_line = format!("{} {} : {}", pk_marker, fk_marker, attr.name);
+                output.push('│');
+                output.push_str(&format!("{:<width$}", attr_line, width = box_width));
+                output.push_str("│\n");
+            }
+            
+            // Bottom border
+            output.push('└');
+            output.push_str(&"─".repeat(box_width));
+            output.push_str("┘\n");
+            output.push('\n');
+        }
+        
+        // Render relationships
+        for rel in &diagram.relationships {
+            let arrow = match rel.rel_type.as_str() {
+                "||--" | "||-|-" => "═╪══",
+                "}|--" | "}|-" => "◄───",
+                "}o--" | "}o-" => "○───",
+                "o{--" | "o{" => "───○",
+                "o|--" | "o|-" => "───◄",
+                _ => "────",
+            };
+            output.push_str(&format!("{} {}\n", rel.from, arrow));
+        }
+        
+        output
+    }
+    
+    fn calculate_er_box_width(&self, entity: &Entity) -> usize {
+        let mut max_width = entity.name.len();
+        for attr in &entity.attributes {
+            let attr_str = format!("{}  {} : {}", 
+                if attr.is_primary_key { "PK" } else { "  " },
+                if attr.is_foreign_key { "FK" } else { "  " },
+                attr.name
+            );
+            max_width = max_width.max(attr_str.len());
+        }
+        max_width.max(20).min(50)
     }
     
     fn draw_node(&self, canvas: &mut Vec<Vec<char>>, pos: &Position, label: &str) {
