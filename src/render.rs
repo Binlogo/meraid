@@ -4,6 +4,40 @@ use crate::diagram::{Diagram, DiagramType, EdgeStyle, Entity, Node};
 use crate::layout::{LayoutResult, Position};
 use crate::theme::Theme;
 
+/// Calculate the display width of a string in a terminal.
+/// - ASCII characters: 1 cell width
+/// - CJK (Chinese, Japanese, Korean): 2 cell widths
+/// - Other wide characters: 2 cell widths
+/// - Control characters: 0 cell width
+fn str_width(s: &str) -> usize {
+    s.chars().map(|c| {
+        if c.is_ascii() {
+            1
+        } else if is_cjk(c) {
+            2
+        } else if c.is_whitespace() {
+            1
+        } else {
+            // Default for other characters
+            2
+        }
+    }).sum()
+}
+
+/// Check if a character is CJK (Chinese, Japanese, Korean)
+fn is_cjk(c: char) -> bool {
+    matches!(c,
+        '\u{4E00}'..='\u{9FFF}' |  // CJK Unified Ideographs
+        '\u{3400}'..='\u{4DBF}' |  // CJK Unified Ideographs Extension A
+        '\u{F900}'..='\u{FAFF}' |  // CJK Compatibility Ideographs
+        '\u{3000}'..='\u{303F}' |  // CJK Symbols and Punctuation
+        '\u{FF00}'..='\u{FFEF}' |  // Fullwidth Forms
+        '\u{3040}'..='\u{309F}' |  // Hiragana
+        '\u{30A0}'..='\u{30FF}' |  // Katakana
+        '\u{AC00}'..='\u{D7AF}'    // Hangul Syllables
+    )
+}
+
 /// Renderer for terminal output
 #[allow(dead_code)]
 pub struct Renderer {
@@ -146,8 +180,8 @@ impl Renderer {
 
         for node in &diagram.nodes {
             if let Some(_pos) = layout.positions.get(&node.id) {
-                // Calculate box width based on content
-                let mut max_width = node.get_label().len();
+                // Calculate box width based on content (using display width for CJK support)
+                let mut max_width = str_width(node.get_label());
                 for member in &node.members {
                     let prefix = match member.visibility {
                         crate::diagram::Visibility::Public => "+",
@@ -156,7 +190,7 @@ impl Renderer {
                         crate::diagram::Visibility::Package => "~",
                     };
                     let member_str = format!("{} {}", prefix, member.name);
-                    max_width = max_width.max(member_str.len());
+                    max_width = max_width.max(str_width(&member_str));
                 }
                 let box_width = max_width.clamp(16, 40);
 
@@ -335,14 +369,14 @@ impl Renderer {
     }
     
     fn calculate_er_box_width(&self, entity: &Entity) -> usize {
-        let mut max_width = entity.name.len();
+        let mut max_width = str_width(&entity.name);
         for attr in &entity.attributes {
             let attr_str = format!("{}  {} : {}", 
                 if attr.is_primary_key { "PK" } else { "  " },
                 if attr.is_foreign_key { "FK" } else { "  " },
                 attr.name
             );
-            max_width = max_width.max(attr_str.len());
+            max_width = max_width.max(str_width(&attr_str));
         }
         max_width.clamp(20, 50)
     }
@@ -511,11 +545,23 @@ impl Renderer {
     }
     
     fn pad_string(&self, s: &str, width: usize) -> String {
-        if s.len() >= width {
-            s.chars().take(width).collect()
+        let s_width = str_width(s);
+        if s_width >= width {
+            // Truncate to display width
+            let mut result = String::new();
+            let mut current_width = 0;
+            for c in s.chars() {
+                let c_width = if c.is_ascii() { 1 } else if is_cjk(c) { 2 } else { 1 };
+                if current_width + c_width > width {
+                    break;
+                }
+                result.push(c);
+                current_width += c_width;
+            }
+            result
         } else {
-            let left = (width - s.len()) / 2;
-            let right = width - s.len() - left;
+            let left = (width - s_width) / 2;
+            let right = width - s_width - left;
             format!("{}{}{}", " ".repeat(left), s, " ".repeat(right))
         }
     }
