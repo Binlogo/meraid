@@ -275,6 +275,53 @@ pie title 领养的宠物
   鼠┃░   3.1%
 ```
 
+### ER 图
+
+````mermaid
+erDiagram
+    CUSTOMER {
+        int id PK
+        string name
+        string email
+    }
+    ORDER {
+        int id PK
+        int customer_id FK
+        date order_date
+    }
+    CUSTOMER ||--o{ ORDER : places
+````
+
+```
+  ┌────────────────────┐
+  │      CUSTOMER      │
+  ├────────────────────┤
+  │PK    : id          │
+  │      : name        │
+  │      : email       │
+  └────────────────────┘
+  
+  ┌────────────────────┐
+  │       ORDER        │
+  ├────────────────────┤
+  │PK    : id          │
+  │   FK : customer_id │
+  │      : order_date  │
+  └────────────────────┘
+  
+  CUSTOMER ||--o{ ORDER
+```
+
+**基数符号：**
+- `||` 恰好一个
+- `}|` 一个或多个  
+- `o|` 零个或一个
+- `o{` 零个或多个
+
+**属性标记：**
+- `PK` 主键
+- `FK` 外键
+
 ## CLI 选项
 
 | 参数 | 描述 |
@@ -302,7 +349,7 @@ pie title 领养的宠物
 
 ## 路线图
 
-- [ ] ER 图
+- [x] ER 图 ✅
 - [ ] 块图
 - [ ] Git 提交图
 - [ ] 树图

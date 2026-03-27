@@ -457,7 +457,8 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
     }
     
     // Extract relationships
-    let rel_types = ["||--", "}|--", "}o--", "o{--", "o|--", "||-|"];
+    // Mermaid ER format: ENTITY1 cardinality1--cardinality2 ENTITY2 : label
+    // Cardinality: || (exactly one), }| (one or more), o| (zero or one), o{ (zero or more)
     for line in source.lines() {
         let line = line.trim();
         
@@ -465,29 +466,65 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
             continue;
         }
         
-        for rel_type in rel_types {
-            if line.contains(rel_type) {
-                let parts: Vec<&str> = line.split(rel_type).collect();
-                if parts.len() == 2 {
-                    let from = parts[0].trim();
-                    let to = parts[1].trim();
-                    
-                    // Skip if it contains braces (part of entity definition)
-                    if !from.is_empty() && !to.is_empty() && !from.contains('{') && !to.contains('}') {
-                        let _rel_label = if line.contains(':') {
-                            let label_parts: Vec<&str> = line.split(':').collect();
-                            Some(label_parts.get(1).map(|s| s.trim()).unwrap_or("").to_string())
-                        } else {
-                            None
-                        };
-                        
-                        relationships.push(Relationship {
-                            from: from.to_string(),
-                            to: to.to_string(),
-                            rel_type: rel_type.to_string(),
-                        });
-                    }
-                }
+        // Skip entity definition blocks (lines with curly braces that are entity definitions)
+        if line.contains('{') && line.contains('}') && !line.contains("--") {
+            continue;
+        }
+        
+        // Look for relationship patterns with -- in the middle
+        if let Some(dash_pos) = line.find("--") {
+            let before = &line[..dash_pos];
+            let after = &line[dash_pos + 2..]; // Skip "--"
+            
+            // Parse left side: ENTITY + cardinality
+            let before_parts: Vec<&str> = before.split_whitespace().collect();
+            if before_parts.is_empty() {
+                continue;
+            }
+            let from = before_parts[0];
+            let left_card = before_parts.get(1).unwrap_or(&"");
+            
+            // Parse right side: cardinality + rest
+            // Find where the cardinality ends and entity name begins
+            // Cardinality symbols: ||, }|, }o, o{, o|
+            let right_card_end = if after.starts_with("||") {
+                2
+            } else if after.starts_with("}|") || after.starts_with("}o") || after.starts_with("o{") || after.starts_with("o|") {
+                2
+            } else {
+                0
+            };
+            
+            if right_card_end == 0 {
+                continue; // No valid cardinality found
+            }
+            
+            let right_card = &after[..right_card_end];
+            let rest = &after[right_card_end..].trim_start();
+            
+            // Extract entity name and optional label
+            let (to, _label): (&str, Option<String>) = if let Some(space_pos) = rest.find(' ') {
+                let entity = &rest[..space_pos];
+                let remaining = &rest[space_pos..];
+                let lbl = if let Some(colon_pos) = remaining.find(':') {
+                    Some(remaining[colon_pos + 1..].trim().trim_matches('"').to_string())
+                } else {
+                    None
+                };
+                (entity, lbl)
+            } else {
+                (rest, None)
+            };
+            
+            // Build relationship type
+            let rel_type = format!("{}--{}", left_card, right_card);
+            
+            if !from.is_empty() && !to.is_empty() && from.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                relationships.push(Relationship {
+                    from: from.to_string(),
+                    to: to.to_string(),
+                    rel_type,
+                });
             }
         }
     }
@@ -502,34 +539,28 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
 fn parse_er_body(entity_def: &str) -> Vec<EntityAttribute> {
     let mut attrs = Vec::new();
     
-    if let Some(start) = entity_def.find('{') {
-        if let Some(end) = entity_def.find('}') {
-            let body = &entity_def[start+1..end];
+    // The body is already extracted (between { and }), so we can process it directly
+    for line in entity_def.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        
+        let is_pk = line.contains(" PK") || line.ends_with(" PK");
+        let is_fk = line.contains(" FK") || line.ends_with(" FK");
+        
+        // Parse format: "type name" or "type name PK" or "type name FK"
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let attr_type = parts[0].to_string();
+            let name = parts[1].to_string();
             
-            for line in body.lines() {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
-                
-                let is_pk = line.starts_with("*") || line.contains(" PK");
-                let is_fk = line.starts_with("+") || line.contains(" FK");
-                
-                let line = line.trim_start_matches(&['*', '+'][..]);
-                
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if !parts.is_empty() {
-                    let name = parts[0].to_string();
-                    let attr_type = parts.get(1).unwrap_or(&"string").to_string();
-                    
-                    attrs.push(EntityAttribute {
-                        name,
-                        attr_type,
-                        is_primary_key: is_pk,
-                        is_foreign_key: is_fk,
-                    });
-                }
-            }
+            attrs.push(EntityAttribute {
+                name,
+                attr_type,
+                is_primary_key: is_pk,
+                is_foreign_key: is_fk,
+            });
         }
     }
     

@@ -282,12 +282,6 @@ impl Renderer {
     fn render_er(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
         
-        // Debug: print entities
-        eprintln!("DEBUG: {} entities found", diagram.entities.len());
-        for e in &diagram.entities {
-            eprintln!("  Entity: {} attrs: {:?}", e.name, e.attributes.len());
-        }
-        
         // Render entities
         for entity in &diagram.entities {
             let box_width = self.calculate_er_box_width(entity);
@@ -326,15 +320,15 @@ impl Renderer {
         
         // Render relationships
         for rel in &diagram.relationships {
-            let arrow = match rel.rel_type.as_str() {
-                "||--" | "||-|-" => "═╪══",
-                "}|--" | "}|-" => "◄───",
-                "}o--" | "}o-" => "○───",
-                "o{--" | "o{" => "───○",
-                "o|--" | "o|-" => "───◄",
-                _ => "────",
+            // Parse relationship type like "||--o{" into left and right cardinality
+            let (left_card, right_card) = if let Some(dash_pos) = rel.rel_type.find("--") {
+                let left = &rel.rel_type[..dash_pos];
+                let right = &rel.rel_type[dash_pos + 2..];
+                (left, right)
+            } else {
+                ("--", "--")
             };
-            output.push_str(&format!("{} {}\n", rel.from, arrow));
+            output.push_str(&format!("{} {}--{} {}\n", rel.from, left_card, right_card, rel.to));
         }
         
         output
