@@ -1,9 +1,9 @@
 <h1 align="center">meraid</h1>
 
-<p align="center">Render Mermaid diagrams in your terminal or Rust application.</p>
+<p align="center">在终端或 Rust 应用中渲染 Mermaid 图表</p>
 
 <p align="center">
-  <img src="docs/demo/meraid-demo.svg" alt="meraid demo" width="800">
+  <img src="docs/demo/meraid-demo.svg" alt="meraid 演示" width="800">
 </p>
 
 <p align="center">
@@ -21,30 +21,32 @@
   </a>
 </p>
 
-## Features
+[English](README.md) | 中文
 
-- **Pure Rust implementation** — Zero external dependencies, blazing fast, fully portable
-- **AI-friendly** — JSON output mode for programmatic parsing, perfect for AI coding agents
-- **5+ diagram types** — Flowcharts, sequence diagrams, class diagrams, state diagrams, pie charts
-- **6 color themes** — default, terra, neon, mono, amber, phosphor
-- **ASCII fallback** — Works on any terminal, even the most basic ones
-- **Pipe-friendly CLI** — `cat diagram.mmd | meraid` just works
+## 特性
 
-## Why Meraid?
+- **纯 Rust 实现** — 零外部依赖，极速运行，完全可移植
+- **AI 友好** — JSON 输出模式，方便 AI 编程工具解析
+- **5+ 图表类型** — 流程图、时序图、类图、状态图、饼图
+- **6 套主题** — default, terra, neon, mono, amber, phosphor
+- **ASCII 回退** — 兼容任何终端
+- **管道友好 CLI** — `cat diagram.mmd | meraid` 即刻使用
 
-Mermaid is excellent for documentation, but rendering it typically requires a browser or external service. Meraid brings Mermaid rendering directly to your terminal — perfect for SSH sessions, CI logs, TUI applications, or any environment with Rust.
+## 为什么选择 Meraid？
 
-Built with love for the Rust ecosystem, providing a fast, dependency-free alternative to existing solutions.
+Mermaid 是文档编写的神器，但渲染它通常需要浏览器或外部服务。Meraid 让 Mermaid 渲染直接进入终端 — 非常适合 SSH 会话、CI 日志、TUI 应用或任何有 Rust 的环境。
 
-## Install
+为 Rust 生态圈而生，提供快速、零依赖的替代方案。
 
-### From Crates.io
+## 安装
+
+### 从 Crates.io 安装
 
 ```bash
 cargo install meraid
 ```
 
-### From Source
+### 从源码构建
 
 ```bash
 git clone https://github.com/Binlogo/meraid.git
@@ -53,34 +55,34 @@ cargo build --release
 cargo install --path .
 ```
 
-### With Homebrew (coming soon)
+### 使用 Homebrew（即将支持）
 
 ```bash
 brew install meraid
 ```
 
-## Quick Start
+## 快速开始
 
-### CLI
+### CLI 使用
 
 ```bash
-# Render from file
+# 从文件渲染
 meraid diagram.mmd
 
-# Render from stdin
+# 从 stdin 输入
 echo "graph LR; A-->B-->C" | meraid
 
-# Use a theme
+# 使用主题
 meraid diagram.mmd --theme neon
 
-# ASCII-only output
+# ASCII 纯文本输出
 meraid diagram.mmd --ascii
 
-# JSON output (AI-friendly)
+# JSON 输出（AI 友好）
 meraid diagram.mmd --format json
 ```
 
-### Rust Library
+### Rust 库使用
 
 ```rust
 use meraid::{render, ThemeType};
@@ -91,84 +93,84 @@ fn main() {
 }
 ```
 
-## Supported Diagram Types
+## 支持的图表类型
 
-### Flowcharts
+### 流程图
 
-All directions supported: `LR`, `RL`, `TD`/`TB`, `BT`.
+支持所有方向：`LR`、`RL`、`TD`/`TB`、`BT`。
 
 ````mermaid
 graph TD
-    A[Start] --> B{Is valid?}
-    B -->|Yes| C(Process)
-    C --> D([Done])
-    B -->|No| E[Error]
+    A[开始] --> B{是否有效?}
+    B -->|是| C(处理)
+    C --> D([完成])
+    B -->|否| E[错误]
 ````
 
 ```
 ┌─────────────┐
 │             │
-│    Start    │
+│    开始     │
 │             │
 └──────┬──────┘
        │
        ▼
 ┌──────◇──────┐
 │             │
-│  Is valid?  │
+│  是否有效?  │
 │             │
 └──────◇──────┘
        │
        ╰──────────────────╮
-    Yes│                  │No
+    是 │                  │否
        ▼                  ▼
 ╭─────────────╮    ┌─────────────┐
 │             │    │             │
-│   Process   │    │    Error    │
+│    处理     │    │    错误    │
 │             │    │             │
 ╰──────┬──────╯    └─────────────┘
        │
        ▼
 ╭─────────────╮
 (             )
-(    Done     )
+(    完成     )
 (             )
 ╰─────────────╯
 ```
 
-**Node shapes:** rectangle `[text]`, rounded `(text)`, diamond `{text}`, stadium `([text])`, subroutine `[[text]]`
+**节点形状：** 矩形 `[文本]`，圆角 `(文本)`，菱形 `{文本}`，体育场 `([文本])`，子程序 `[[文本]]`
 
-**Edge styles:** solid `-->`, dotted `-.->`, thick `==>`, labeled `-->|text|`
+**连线样式：** 实线 `-->`，虚线 `-.->`，粗线 `==>`，带标签 `-->|文本|`
 
-### Sequence Diagrams
+### 时序图
 
 ````mermaid
 sequenceDiagram
-    Alice->>Bob: Hello Bob
-    Bob-->>Alice: Hi Alice
-    Alice->>Bob: How are you?
-    Bob-->>Alice: Great!
+    Alice->>Bob: 你好 Bob
+    Bob-->>Alice: 你好 Alice
+    Alice->>Bob: 最近怎么样?
+    Bob-->>Alice: 很好!
 ````
 
 ```
  ┌──────────┐      ┌──────────┐
  │  Alice   │      │   Bob    │
  └──────────┘      └──────────┘
-      ┆ Hello Bob       ┆
+      ┆ 你好 Bob        ┆
       ──────────────────►
-      ┆ Hi Alice        ┆
+      ┆ 你好 Alice      ┆
       ◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-      ┆ How are you?    ┆
+      ┆ 最近怎么样?     ┆
       ──────────────────►
-      ┆ Great!          ┆
+      ┆ 很好!           ┆
       ◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
 ```
 
-**Message types:** solid arrow `->>`, dashed arrow `-->>`
+**消息类型：** 实线箭头 `->>`，虚线箭头 `-->>`
 
-**Participants:** `participant`, `actor`, aliases
+**参与者：** `participant`、`actor`、别名
 
-### Class Diagrams
+### 类图
 
 ````mermaid
 classDiagram
@@ -204,11 +206,11 @@ classDiagram
   └───────────────┘
 ```
 
-**Relationships:** inheritance `<|--`, composition `*--`, aggregation `o--`, association `--`
+**关系：** 继承 `<|--`，组合 `*--`，聚合 `o--`，关联 `--`
 
-**Members:** attributes and methods with visibility (`+` public, `-` private, `#` protected)
+**成员：** 属性和方法，支持可见性（`+` 公有，`-` 私有，`#` 受保护）
 
-### State Diagrams
+### 状态图
 
 ````mermaid
 stateDiagram-v2
@@ -256,77 +258,77 @@ complete│
 ╰───────◯──────╯
 ```
 
-**Features:** `[*]` start/end states, transition labels, composite states
+**特性：** `[*]` 起始/终止状态，转换标签，复合状态
 
-### Pie Charts
+### 饼图
 
 ````mermaid
-pie title Pets adopted by volunteers
-    "Dogs" : 386
-    "Cats" : 85
-    "Rats" : 15
+pie title 领养的宠物
+    "狗" : 386
+    "猫" : 85
+    "鼠" : 15
 ````
 
 ```
-  Dogs┃████████████████████████████████  79.4%
-  Cats┃▓▓▓▓▓▓▓  17.5%
-  Rats┃░   3.1%
+  狗┃████████████████████████████████  79.4%
+  猫┃▓▓▓▓▓▓▓  17.5%
+  鼠┃░   3.1%
 ```
 
-## CLI Options
+## CLI 选项
 
-| Flag | Description |
-|------|-------------|
-| `--ascii` | ASCII-only output (no Unicode box-drawing) |
-| `--theme NAME` | Color theme. Options: default, terra, neon, mono, amber, phosphor |
-| `--padding-x N` | Horizontal padding inside boxes (default: 4) |
-| `--padding-y N` | Vertical padding inside boxes (default: 2) |
-| `--width N` | Max output width (default: 120) |
-| `--sharp-edges` | Sharp corners on edge turns instead of rounded |
-| `--format FORMAT` | Output format: text or json (AI-friendly) |
+| 参数 | 描述 |
+|------|------|
+| `--ascii` | ASCII 纯文本输出（无 Unicode 边框） |
+| `--theme 名称` | 颜色主题。可选：default, terra, neon, mono, amber, phosphor |
+| `--padding-x N` | 节点内水平边距（默认：4） |
+| `--padding-y N` | 节点内垂直边距（默认：2） |
+| `--width N` | 最大输出宽度（默认：120） |
+| `--sharp-edges` | 连线使用尖角而非圆角 |
+| `--format 格式` | 输出格式：text 或 json（AI 友好） |
 
-## Themes
+## 主题
 
-6 built-in themes:
+6 套内置主题：
 
-| Theme | Colors | Description |
-|-------|--------|-------------|
-| `default` | Cyan nodes, yellow arrows | Default terminal colors |
-| `terra` | Warm earth tones (browns, oranges) | Retro/vintage feel |
-| `neon` | Magenta nodes, green arrows | Cyberpunk style |
-| `mono` | White/gray monochrome | Simple and clean |
-| `amber` | Amber/gold CRT-style | Classic amber monitor |
-| `phosphor` | Green phosphor terminal-style | Classic green terminal |
+| 主题 | 颜色 | 描述 |
+|------|------|------|
+| `default` | 青色节点，黄色箭头 | 默认终端颜色 |
+| `terra` | 暖色调（棕色、橙色） | 复古风格 |
+| `neon` | 洋红节点，绿色箭头 | 赛博朋克风格 |
+| `mono` | 灰度单色 | 简洁干净 |
+| `amber` | 琥珀色 CRT 风格 | 经典琥珀显示器 |
+| `phosphor` | 绿色荧光管风格 | 经典绿色终端 |
 
-## Roadmap
+## 路线图
 
-- [ ] ER diagrams
-- [ ] Block diagrams
-- [ ] Git graphs
-- [ ] Treemaps
-- [ ] Mindmaps
-- [ ] More themes (gruvbox, monokai, dracula, nord, solarized)
-- [ ] Auto-fit to terminal width
-- [ ] Interactive TUI viewer
+- [ ] ER 图
+- [ ] 块图
+- [ ] Git 提交图
+- [ ] 树图
+- [ ] 思维导图
+- [ ] 更多主题（gruvbox, monokai, dracula, nord, solarized）
+- [ ] 自动适应终端宽度
+- [ ] 交互式 TUI 查看器
 
-## Contributing
+## 贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎贡献！请随时提交 Pull Request。
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 本仓库
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交更改（`git commit -m 'Add amazing feature'`）
+4. 推送分支（`git push origin feature/amazing-feature`）
+5. 打开 Pull Request
 
-## Acknowledgements
+## 致谢
 
-Inspired by [termaid](https://github.com/fasouto/termaid) by fasouto.
+灵感来源：[termaid](https://github.com/fasouto/termaid) by fasouto
 
-## License
+## 许可证
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT 许可证 — 详见 [LICENSE](LICENSE)。
 
 ---
 
-<p align="center">Made with ❤️ in Rust</p>
+<p align="center">用 ❤️ Rust 打造</p>
