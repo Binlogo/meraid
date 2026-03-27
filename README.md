@@ -273,6 +273,53 @@ pie title Pets adopted by volunteers
   Rats┃░   3.1%
 ```
 
+### ER Diagrams
+
+````mermaid
+erDiagram
+    CUSTOMER {
+        int id PK
+        string name
+        string email
+    }
+    ORDER {
+        int id PK
+        int customer_id FK
+        date order_date
+    }
+    CUSTOMER ||--o{ ORDER : places
+````
+
+```
+  ┌────────────────────┐
+  │      CUSTOMER      │
+  ├────────────────────┤
+  │PK    : id          │
+  │      : name        │
+  │      : email       │
+  └────────────────────┘
+  
+  ┌────────────────────┐
+  │       ORDER        │
+  ├────────────────────┤
+  │PK    : id          │
+  │   FK : customer_id │
+  │      : order_date  │
+  └────────────────────┘
+  
+  CUSTOMER ||--o{ ORDER
+```
+
+**Cardinality notation:**
+- `||` exactly one
+- `}|` one or more  
+- `o|` zero or one
+- `o{` zero or more
+
+**Attribute markers:**
+- `PK` primary key
+- `FK` foreign key
+
 ## CLI Options
 
 | Flag | Description |
@@ -300,7 +347,7 @@ pie title Pets adopted by volunteers
 
 ## Roadmap
 
-- [ ] ER diagrams
+- [x] ER diagrams ✅
 - [ ] Block diagrams
 - [ ] Git graphs
 - [ ] Treemaps
