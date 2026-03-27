@@ -40,10 +40,10 @@ Mermaid 是文档编写的神器，但渲染它通常需要浏览器或外部服
 
 ## 安装
 
-### 从 Crates.io 安装
+### 从 Git 安装（推荐 - 最新版本）
 
 ```bash
-cargo install meraid
+cargo install --git https://github.com/Binlogo/meraid.git
 ```
 
 ### 从源码构建
@@ -53,6 +53,12 @@ git clone https://github.com/Binlogo/meraid.git
 cd meraid
 cargo build --release
 cargo install --path .
+```
+
+### 从 Crates.io 安装（即将支持）
+
+```bash
+cargo install meraid
 ```
 
 ### 使用 Homebrew（即将支持）

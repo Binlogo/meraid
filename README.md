@@ -38,10 +38,10 @@ Built with love for the Rust ecosystem, providing a fast, dependency-free altern
 
 ## Install
 
-### From Crates.io
+### From Git (Recommended - Latest)
 
 ```bash
-cargo install meraid
+cargo install --git https://github.com/Binlogo/meraid.git
 ```
 
 ### From Source
@@ -51,6 +51,12 @@ git clone https://github.com/Binlogo/meraid.git
 cd meraid
 cargo build --release
 cargo install --path .
+```
+
+### From Crates.io (Coming Soon)
+
+```bash
+cargo install meraid
 ```
 
 ### With Homebrew (coming soon)
