@@ -1,0 +1,147 @@
+<svg width="1600" height="940" viewBox="0 0 1600 940" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">meraid demo</title>
+  <desc id="desc">A representative README demo showing Mermaid source, terminal rendering output, JSON output mode, and built-in themes for the meraid Rust CLI.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="128" y1="72" x2="1500" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7F1E6"/>
+      <stop offset="1" stop-color="#EDE1CC"/>
+    </linearGradient>
+    <linearGradient id="window" x1="132" y1="132" x2="1476" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171512"/>
+      <stop offset="1" stop-color="#221D17"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="170" y1="228" x2="1452" y2="734" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#201A14"/>
+      <stop offset="1" stop-color="#181510"/>
+    </linearGradient>
+    <linearGradient id="amberGlow" x1="360" y1="240" x2="980" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFCA54" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#FF8C1A" stop-opacity="0.06"/>
+    </linearGradient>
+    <filter id="shadow" x="72" y="86" width="1468" height="776" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="16"/>
+      <feGaussianBlur stdDeviation="24"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.176471 0 0 0 0 0.12549 0 0 0 0 0.0823529 0 0 0 0.28 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+    <pattern id="paperGrid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0H0V36" stroke="#8F7F69" stroke-opacity="0.10" stroke-width="1"/>
+    </pattern>
+    <pattern id="tinyDots" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.5" fill="#8B7457" fill-opacity="0.12"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="940" fill="url(#bg)"/>
+  <rect width="1600" height="940" fill="url(#paperGrid)"/>
+  <rect x="1008" y="36" width="520" height="160" fill="url(#tinyDots)" opacity="0.35"/>
+  <rect x="56" y="724" width="300" height="148" fill="url(#tinyDots)" opacity="0.28"/>
+
+  <text x="104" y="118" fill="#2B2217" font-family="Georgia, 'Times New Roman', serif" font-size="56" font-weight="700" letter-spacing="-1.2">Render Mermaid where you work.</text>
+  <text x="106" y="162" fill="#5E4A35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24">Terminal-native diagrams for CLI workflows, CI logs, SSH sessions, and AI agents.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="96" y="198" width="1408" height="640" rx="30" fill="url(#window)"/>
+    <rect x="96.75" y="198.75" width="1406.5" height="638.5" rx="29.25" stroke="#5E4C35" stroke-opacity="0.45" stroke-width="1.5"/>
+  </g>
+
+  <rect x="124" y="226" width="1352" height="58" rx="18" fill="#241D16"/>
+  <circle cx="162" cy="255" r="8" fill="#E48A6A"/>
+  <circle cx="188" cy="255" r="8" fill="#E6B45E"/>
+  <circle cx="214" cy="255" r="8" fill="#86B57B"/>
+  <rect x="248" y="238" width="284" height="34" rx="12" fill="#1A1510" stroke="#4C3B29"/>
+  <text x="270" y="261" fill="#CBB79C" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17">~/workspace/meraid</text>
+  <rect x="1288" y="238" width="154" height="34" rx="12" fill="#31271C" stroke="#6B5537"/>
+  <text x="1314" y="261" fill="#F5D79B" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" font-weight="600">meraid demo</text>
+
+  <text x="136" y="326" fill="#89C27A" font-family="Menlo, Consolas, Monaco, monospace" font-size="23">$</text>
+  <text x="164" y="326" fill="#EFE3D1" font-family="Menlo, Consolas, Monaco, monospace" font-size="23">echo "graph TD; A[Spec] --&gt; B{CI}; B --&gt;|pass| C[Release]" | meraid --theme amber --format json</text>
+
+  <rect x="124" y="356" width="466" height="368" rx="24" fill="#16120E" stroke="#4A3928" stroke-width="1.5"/>
+  <rect x="610" y="356" width="866" height="368" rx="24" fill="#14110D" stroke="#4A3928" stroke-width="1.5"/>
+  <rect x="610" y="356" width="866" height="368" rx="24" fill="url(#amberGlow)"/>
+
+  <text x="154" y="400" fill="#B89A76" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600">mermaid source</text>
+  <text x="640" y="400" fill="#B89A76" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600">terminal render</text>
+
+  <text x="154" y="448" fill="#D7C4AE" font-family="Menlo, Consolas, Monaco, monospace" font-size="22">graph TD</text>
+  <text x="154" y="486" fill="#D7C4AE" font-family="Menlo, Consolas, Monaco, monospace" font-size="22">    A[Spec] --&gt; B{CI}</text>
+  <text x="154" y="524" fill="#D7C4AE" font-family="Menlo, Consolas, Monaco, monospace" font-size="22">    B --&gt;|pass| C[Release]</text>
+  <text x="154" y="562" fill="#D7C4AE" font-family="Menlo, Consolas, Monaco, monospace" font-size="22">    B -. fail .-&gt; D[Fix]</text>
+  <text x="154" y="600" fill="#D7C4AE" font-family="Menlo, Consolas, Monaco, monospace" font-size="22">    D --&gt; A</text>
+
+  <rect x="154" y="640" width="170" height="34" rx="12" fill="#2D2216"/>
+  <text x="178" y="663" fill="#FFD38C" font-family="Menlo, Consolas, Monaco, monospace" font-size="18">stdin friendly</text>
+  <rect x="336" y="640" width="134" height="34" rx="12" fill="#1E2A1B"/>
+  <text x="360" y="663" fill="#9CE59C" font-family="Menlo, Consolas, Monaco, monospace" font-size="18">pure Rust</text>
+
+  <rect x="736" y="432" width="164" height="72" rx="18" fill="#2D1E08" stroke="#8A6422" stroke-width="1.5"/>
+  <text x="818" y="475" text-anchor="middle" fill="#FFC54A" font-family="Menlo, Consolas, Monaco, monospace" font-size="28">Spec</text>
+
+  <path d="M818 505V555" stroke="#FF9B29" stroke-width="4" stroke-linecap="round"/>
+  <path d="M808 543L818 557L828 543" stroke="#FF9B29" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <polygon points="736,582 818,530 900,582 818,634" fill="#291D0B" stroke="#FFA238" stroke-width="1.5"/>
+  <text x="818" y="590" text-anchor="middle" fill="#FFD76B" font-family="Menlo, Consolas, Monaco, monospace" font-size="26">CI</text>
+
+  <path d="M900 582H1092" stroke="#FF8A1A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M1080 572L1094 582L1080 592" stroke="#FF8A1A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="978" y="566" text-anchor="middle" fill="#FFD176" font-family="Menlo, Consolas, Monaco, monospace" font-size="20">pass</text>
+
+  <rect x="1098" y="546" width="196" height="72" rx="18" fill="#2D1E08" stroke="#8A6422" stroke-width="1.5"/>
+  <text x="1196" y="589" text-anchor="middle" fill="#FFC54A" font-family="Menlo, Consolas, Monaco, monospace" font-size="28">Release</text>
+
+  <path d="M736 582H648V656H620" stroke="#B68744" stroke-width="4" stroke-linecap="round" stroke-dasharray="10 10"/>
+  <path d="M632 646L618 656L632 666" stroke="#B68744" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="658" y="566" text-anchor="middle" fill="#D4B27A" font-family="Menlo, Consolas, Monaco, monospace" font-size="20">fail</text>
+
+  <rect x="610" y="620" width="160" height="72" rx="18" fill="#21180D" stroke="#6F5330" stroke-width="1.5"/>
+  <text x="690" y="663" text-anchor="middle" fill="#E8C27C" font-family="Menlo, Consolas, Monaco, monospace" font-size="28">Fix</text>
+
+  <path d="M690 620V462H720" stroke="#B68744" stroke-width="4" stroke-linecap="round"/>
+  <path d="M708 452L722 462L708 472" stroke="#B68744" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="1284" y="410" width="158" height="36" rx="12" fill="#231A10" stroke="#6C522F"/>
+  <text x="1363" y="434" text-anchor="middle" fill="#F2CA7A" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600">theme: amber</text>
+  <rect x="1284" y="458" width="158" height="36" rx="12" fill="#152212" stroke="#315230"/>
+  <text x="1363" y="482" text-anchor="middle" fill="#8DE08D" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600">ascii fallback</text>
+  <rect x="1284" y="506" width="158" height="36" rx="12" fill="#20161D" stroke="#57404F"/>
+  <text x="1363" y="530" text-anchor="middle" fill="#F192D8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600">flowchart</text>
+
+  <rect x="124" y="748" width="1352" height="68" rx="22" fill="#15120E" stroke="#4A3928" stroke-width="1.5"/>
+  <text x="154" y="792" fill="#B89A76" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="600">JSON output for agents</text>
+  <text x="430" y="792" fill="#D7C4AE" font-family="Menlo, Consolas, Monaco, monospace" font-size="21">{"success":true,"metadata":{"type":"flowchart","theme":"amber","width":84}}</text>
+
+  <text x="108" y="884" fill="#5E4A35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22">Built for terminal workflows</text>
+
+  <g>
+    <rect x="690" y="856" width="114" height="34" rx="12" fill="#181818" stroke="#464646"/>
+    <circle cx="714" cy="873" r="7" fill="#FFFFFF"/>
+    <text x="732" y="879" fill="#E8E8E8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">default</text>
+
+    <rect x="816" y="856" width="102" height="34" rx="12" fill="#2D2319" stroke="#6D5236"/>
+    <circle cx="840" cy="873" r="7" fill="#FFB464"/>
+    <text x="858" y="879" fill="#F1D0AF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">terra</text>
+
+    <rect x="930" y="856" width="96" height="34" rx="12" fill="#1C0E24" stroke="#5B2E5D"/>
+    <circle cx="954" cy="873" r="7" fill="#00FF7F"/>
+    <text x="972" y="879" fill="#FF95F8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">neon</text>
+
+    <rect x="1038" y="856" width="92" height="34" rx="12" fill="#111111" stroke="#4E4E4E"/>
+    <circle cx="1062" cy="873" r="7" fill="#C0C0C0"/>
+    <text x="1080" y="879" fill="#E7E7E7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">mono</text>
+
+    <rect x="1142" y="856" width="100" height="34" rx="12" fill="#271B08" stroke="#6D4A18"/>
+    <circle cx="1166" cy="873" r="7" fill="#FFC000"/>
+    <text x="1184" y="879" fill="#FFD98A" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">amber</text>
+
+    <rect x="1254" y="856" width="122" height="34" rx="12" fill="#071507" stroke="#275127"/>
+    <circle cx="1278" cy="873" r="7" fill="#00FF00"/>
+    <text x="1296" y="879" fill="#A3F7A3" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16">phosphor</text>
+  </g>
+</svg>
