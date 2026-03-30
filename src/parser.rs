@@ -522,12 +522,9 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
             // Parse right side: cardinality + rest
             // Find where the cardinality ends and entity name begins
             // Cardinality symbols: ||, }|, }o, o{, o|
-            let right_card_end = if after.starts_with("||") {
-                2
-            } else if after.starts_with("}|")
-                || after.starts_with("}o")
-                || after.starts_with("o{")
-                || after.starts_with("o|")
+            let right_card_end = if ["||", "}|", "}o", "o{", "o|"]
+                .iter()
+                .any(|prefix| after.starts_with(prefix))
             {
                 2
             } else {
@@ -545,16 +542,12 @@ fn parse_er(source: &str) -> anyhow::Result<Diagram> {
             let (to, _label): (&str, Option<String>) = if let Some(space_pos) = rest.find(' ') {
                 let entity = &rest[..space_pos];
                 let remaining = &rest[space_pos..];
-                let lbl = if let Some(colon_pos) = remaining.find(':') {
-                    Some(
-                        remaining[colon_pos + 1..]
-                            .trim()
-                            .trim_matches('"')
-                            .to_string(),
-                    )
-                } else {
-                    None
-                };
+                let lbl = remaining.find(':').map(|colon_pos| {
+                    remaining[colon_pos + 1..]
+                        .trim()
+                        .trim_matches('"')
+                        .to_string()
+                });
                 (entity, lbl)
             } else {
                 (rest, None)

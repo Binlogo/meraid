@@ -432,8 +432,8 @@ impl Renderer {
         // Top border
         if px + w < canvas[0].len() {
             canvas[py][px] = chars.top_left.to_string();
-            for _x in (px + 1)..(px + w - 1) {
-                canvas[py][_x] = chars.horizontal.to_string();
+            for cell in canvas[py].iter_mut().take(px + w - 1).skip(px + 1) {
+                *cell = chars.horizontal.to_string();
             }
             canvas[py][px + w - 1] = chars.top_right.to_string();
         }
@@ -441,8 +441,8 @@ impl Renderer {
         // Bottom border
         if py + h < canvas.len() && px + w < canvas[0].len() {
             canvas[py + h][px] = chars.bottom_left.to_string();
-            for _x in (px + 1)..(px + w - 1) {
-                canvas[py + h][_x] = chars.horizontal.to_string();
+            for cell in canvas[py + h].iter_mut().take(px + w - 1).skip(px + 1) {
+                *cell = chars.horizontal.to_string();
             }
             canvas[py + h][px + w - 1] = chars.bottom_right.to_string();
         }

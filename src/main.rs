@@ -134,10 +134,10 @@ fn run() -> anyhow::Result<()> {
         .padding(cli.padding_x, cli.padding_y);
 
     // Render
-    match meraid::parse_mermaid(&source).and_then(|diagram| {
+    match meraid::parse_mermaid(&source).map(|diagram| {
         let layout = meraid::Layout::new(&diagram).layout();
         let output = renderer.render(&diagram, &layout);
-        Ok((diagram, layout, output))
+        (diagram, layout, output)
     }) {
         Ok((diagram, layout, output)) => {
             if json_mode {
