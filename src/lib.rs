@@ -3,14 +3,14 @@
 //! A Rust implementation for rendering Mermaid diagrams in the terminal.
 
 pub mod diagram;
-pub mod parser;
 pub mod layout;
+pub mod parser;
 pub mod render;
 pub mod theme;
 
-pub use diagram::{Diagram, DiagramType, Node, Edge, NodeShape, EdgeStyle};
-pub use parser::parse_mermaid;
+pub use diagram::{Diagram, DiagramType, Edge, EdgeStyle, Node, NodeShape};
 pub use layout::Layout;
+pub use parser::parse_mermaid;
 pub use render::Renderer;
 pub use theme::{Theme, ThemeType};
 
@@ -37,10 +37,10 @@ pub fn render_with_theme(source: &str, theme: Theme) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse_mermaid, DiagramType, ThemeType, Layout, Renderer, Theme};
-    
+    use crate::{parse_mermaid, DiagramType, Layout, Renderer, Theme, ThemeType};
+
     // ==================== Parser Tests ====================
-    
+
     #[test]
     fn test_parse_flowchart_basic() {
         let source = r#"
@@ -51,7 +51,7 @@ A --> B
         assert_eq!(diagram.diagram_type, DiagramType::Flowchart);
         assert_eq!(diagram.direction, "LR");
     }
-    
+
     #[test]
     fn test_parse_flowchart_multiple_edges() {
         let source = r#"
@@ -63,28 +63,28 @@ A --> D
         assert_eq!(diagram.nodes.len(), 4);
         assert_eq!(diagram.edges.len(), 3);
     }
-    
+
     #[test]
     fn test_parse_flowchart_chained() {
         let source = "graph LR\nA --> B --> C --> D";
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.edges.len(), 3);
     }
-    
+
     #[test]
     fn test_parse_flowchart_thick_arrow() {
         let source = "graph LR\nA ==> B";
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.edges.len(), 1);
     }
-    
+
     #[test]
     fn test_parse_flowchart_dotted_arrow() {
         let source = "graph LR\nA -.-> B";
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.edges.len(), 1);
     }
-    
+
     #[test]
     fn test_parse_sequence_diagram() {
         let source = r#"
@@ -99,7 +99,7 @@ Alice->>Bob: How are you?
         assert!(diagram.participants.contains(&"Bob".to_string()));
         assert_eq!(diagram.edges.len(), 3);
     }
-    
+
     #[test]
     fn test_parse_sequence_participants() {
         let source = r#"
@@ -112,7 +112,7 @@ Alice->>Bob: Hello
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.participants.len(), 3);
     }
-    
+
     #[test]
     fn test_parse_class_diagram() {
         let source = r#"
@@ -129,7 +129,7 @@ Animal <|-- Dog
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.diagram_type, DiagramType::Class);
     }
-    
+
     #[test]
     fn test_parse_state_diagram() {
         let source = r#"
@@ -142,7 +142,7 @@ Done --> [*]
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.diagram_type, DiagramType::State);
     }
-    
+
     #[test]
     fn test_parse_pie_chart() {
         let source = r#"
@@ -155,21 +155,21 @@ pie title Pets
         assert_eq!(diagram.diagram_type, DiagramType::Pie);
         assert_eq!(diagram.nodes.len(), 3);
     }
-    
+
     #[test]
     fn test_parse_unknown_defaults_to_flowchart() {
         let source = "A --> B";
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.diagram_type, DiagramType::Flowchart);
     }
-    
+
     #[test]
     fn test_parse_flowchart_vertical_direction() {
         let source = "graph TB\nA --> B";
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.direction, "TB");
     }
-    
+
     #[test]
     fn test_parse_comments_ignored() {
         let source = r#"
@@ -182,9 +182,9 @@ A --> B
         let diagram = parse_mermaid(source).unwrap();
         assert_eq!(diagram.edges.len(), 1);
     }
-    
+
     // ==================== Integration Tests ====================
-    
+
     #[test]
     fn test_full_render_flowchart() {
         let source = "graph LR\nA --> B";
@@ -193,10 +193,10 @@ A --> B
         let theme = Theme::get(ThemeType::Default);
         let renderer = Renderer::new(theme);
         let output = renderer.render(&diagram, &layout);
-        
+
         assert!(!output.is_empty());
     }
-    
+
     #[test]
     fn test_full_render_sequence() {
         let source = "sequenceDiagram\nAlice->>Bob: Hello";
@@ -205,10 +205,10 @@ A --> B
         let theme = Theme::get(ThemeType::Default);
         let renderer = Renderer::new(theme);
         let output = renderer.render(&diagram, &layout);
-        
+
         assert!(!output.is_empty());
     }
-    
+
     #[test]
     fn test_full_render_pie() {
         let source = "pie title Test\nA : 50\nB : 50";
@@ -217,7 +217,7 @@ A --> B
         let theme = Theme::get(ThemeType::Default);
         let renderer = Renderer::new(theme);
         let output = renderer.render(&diagram, &layout);
-        
+
         assert!(!output.is_empty());
     }
 
@@ -254,7 +254,7 @@ class 用户服务 {
         assert!(output.contains("│   开始   │"));
         assert!(output.contains("└──────────┘"));
     }
-    
+
     #[test]
     fn test_sequence_diagram_with_chinese_and_mixed_text_alignment() {
         let source = r#"
@@ -300,7 +300,7 @@ stateDiagram-v2
     fn test_all_themes() {
         let source = "graph LR\nA --> B";
         let diagram = parse_mermaid(source).unwrap();
-        
+
         for theme_type in [
             ThemeType::Default,
             ThemeType::Terra,
@@ -316,53 +316,53 @@ stateDiagram-v2
             assert!(!output.is_empty());
         }
     }
-    
+
     // ==================== Layout Tests ====================
-    
+
     #[test]
     fn test_flowchart_layout_has_positions() {
         let source = "graph LR\nA --> B --> C";
         let diagram = parse_mermaid(source).unwrap();
         let layout = Layout::new(&diagram).layout();
-        
+
         assert!(!layout.positions.is_empty());
         assert!(layout.width > 0);
         assert!(layout.height > 0);
     }
-    
+
     #[test]
     fn test_layout_with_many_nodes() {
         let source = "graph LR\nA --> B --> C --> D --> E --> F --> G --> H";
         let diagram = parse_mermaid(source).unwrap();
         let layout = Layout::new(&diagram).layout();
-        
+
         assert_eq!(layout.positions.len(), 8);
     }
-    
+
     // ==================== Render Tests ====================
-    
+
     #[test]
     fn test_renderer_respects_ascii_only() {
         let source = "graph LR\nA --> B";
         let diagram = parse_mermaid(source).unwrap();
         let layout = Layout::new(&diagram).layout();
         let theme = Theme::get(ThemeType::Default);
-        
+
         let renderer = Renderer::new(theme).ascii_only(true);
         let output = renderer.render(&diagram, &layout);
-        
+
         // ASCII mode should use +, -, |
         assert!(output.contains('+') || output.contains('-') || output.contains('|'));
     }
-    
+
     // ==================== Edge Cases ====================
-    
+
     #[test]
     fn test_empty_source() {
         let result = parse_mermaid("");
         assert!(result.is_ok());
     }
-    
+
     #[test]
     fn test_only_comments() {
         let source = "%% comment only";
@@ -370,7 +370,7 @@ stateDiagram-v2
         // Should default to flowchart with no nodes
         assert_eq!(diagram.diagram_type, DiagramType::Flowchart);
     }
-    
+
     #[test]
     fn test_complex_flow() {
         let source = r#"
@@ -382,7 +382,7 @@ C --> E[End]
 D --> E
 "#;
         let diagram = parse_mermaid(source).unwrap();
-        // Due to how parsing works, each labeled node (A[Start], B{Decision}, etc.) 
+        // Due to how parsing works, each labeled node (A[Start], B{Decision}, etc.)
         // might create multiple entries. Just check we have nodes and edges.
         assert!(diagram.nodes.len() >= 5);
         assert!(diagram.edges.len() >= 5);

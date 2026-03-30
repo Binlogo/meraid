@@ -14,23 +14,27 @@ impl Color {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
-    
+
     /// Convert to ANSI 256 color
     pub fn to_ansi256(&self) -> u8 {
         if self.r == self.g && self.g == self.b {
             let gray = self.r;
-            if gray < 8 { return 16; }
-            if gray > 248 { return 231; }
+            if gray < 8 {
+                return 16;
+            }
+            if gray > 248 {
+                return 231;
+            }
             return ((gray - 8) / 247) * 24 + 232;
         }
-        
+
         let r = (self.r as f32 / 255.0 * 5.0) as u8;
         let g = (self.g as f32 / 255.0 * 5.0) as u8;
         let b = (self.b as f32 / 255.0 * 5.0) as u8;
-        
+
         16 + r * 36 + g * 6 + b
     }
-    
+
     /// Convert to ANSI escape sequence
     pub fn to_escape(&self) -> String {
         format!("\x1b[38;5;{}m", self.to_ansi256())
@@ -76,7 +80,7 @@ pub enum ThemeType {
 
 impl std::str::FromStr for ThemeType {
     type Err = String;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "default" => Ok(ThemeType::Default),
@@ -162,15 +166,29 @@ pub mod ansi {
     pub const RESET: &str = "\x1b[0m";
     pub const BOLD: &str = "\x1b[1m";
     pub const ITALIC: &str = "\x1b[3m";
-    
+
     /// Move cursor
-    pub fn cursor_up(n: u16) -> String { format!("\x1b[{}A", n) }
-    pub fn cursor_down(n: u16) -> String { format!("\x1b[{}B", n) }
-    pub fn cursor_forward(n: u16) -> String { format!("\x1b[{}C", n) }
-    pub fn cursor_back(n: u16) -> String { format!("\x1b[{}D", n) }
-    pub fn cursor_position(row: u16, col: u16) -> String { format!("\x1b[{};{}H", row, col) }
-    
+    pub fn cursor_up(n: u16) -> String {
+        format!("\x1b[{}A", n)
+    }
+    pub fn cursor_down(n: u16) -> String {
+        format!("\x1b[{}B", n)
+    }
+    pub fn cursor_forward(n: u16) -> String {
+        format!("\x1b[{}C", n)
+    }
+    pub fn cursor_back(n: u16) -> String {
+        format!("\x1b[{}D", n)
+    }
+    pub fn cursor_position(row: u16, col: u16) -> String {
+        format!("\x1b[{};{}H", row, col)
+    }
+
     /// Clear screen
-    pub fn clear_screen() -> String { "\x1b[2J".to_string() }
-    pub fn clear_line() -> String { "\x1b[2K".to_string() }
+    pub fn clear_screen() -> String {
+        "\x1b[2J".to_string()
+    }
+    pub fn clear_line() -> String {
+        "\x1b[2K".to_string()
+    }
 }

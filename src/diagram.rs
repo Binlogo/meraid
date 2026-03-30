@@ -20,27 +20,27 @@ pub enum DiagramType {
 /// Node shape styles
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeShape {
-    Rectangle,      // [text]
-    Rounded,        // (text)
-    Diamond,        // {text}
-    Stadium,        // ([text])
-    Subroutine,     // [[text]]
-    Circle,         // ((text))
-    DoubleCircle,   // (((text)))
-    Hexagon,        // {{text}}
-    Cylinder,       // [(text)]
-    Asymmetric,     // >text]
-    Parallelogram,  // [/text/]
-    Trapezoid,      // [/text\]
+    Rectangle,     // [text]
+    Rounded,       // (text)
+    Diamond,       // {text}
+    Stadium,       // ([text])
+    Subroutine,    // [[text]]
+    Circle,        // ((text))
+    DoubleCircle,  // (((text)))
+    Hexagon,       // {{text}}
+    Cylinder,      // [(text)]
+    Asymmetric,    // >text]
+    Parallelogram, // [/text/]
+    Trapezoid,     // [/text\]
 }
 
 /// Edge/Arrow styles
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EdgeStyle {
-    Solid,          // -->
+    Solid,         // -->
     Dotted,        // -.->
     Thick,         // ==>
-    Bidirectional,  // <-->
+    Bidirectional, // <-->
     CircleEnd,     // --o
     CrossEnd,      // --x
 }
@@ -91,7 +91,7 @@ pub struct Edge {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Diagram {
     pub diagram_type: DiagramType,
-    pub direction: String,  // LR, RL, TB, BT
+    pub direction: String, // LR, RL, TB, BT
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub relationships: Vec<Relationship>,
@@ -134,7 +134,7 @@ pub struct EntityAttribute {
 pub struct Relationship {
     pub from: String,
     pub to: String,
-    pub rel_type: String,  // <|--, *--, o--, --, ..>, ..|>
+    pub rel_type: String, // <|--, *--, o--, --, ..>, ..|>
 }
 
 impl Node {

@@ -30,18 +30,18 @@ impl Renderer {
             padding_y: 1,
         }
     }
-    
+
     pub fn ascii_only(mut self, ascii: bool) -> Self {
         self.ascii_only = ascii;
         self
     }
-    
+
     pub fn padding(mut self, x: usize, y: usize) -> Self {
         self.padding_x = x;
         self.padding_y = y;
         self
     }
-    
+
     /// Render diagram to string
     pub fn render(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
         match diagram.diagram_type {
@@ -54,40 +54,38 @@ impl Renderer {
             _ => self.render_flowchart(diagram, layout),
         }
     }
-    
+
     fn render_flowchart(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
         let mut output = String::new();
-        
+
         // Create canvas. Each column is a terminal cell, so use strings instead of chars
         // to support wide characters like Chinese without stretching the box.
         let canvas_width = layout.width.max(80);
         let canvas_height = layout.height.max(20);
-        let mut canvas: Vec<Vec<String>> = vec![
-            vec![" ".to_string(); canvas_width]
-        ];
-        
+        let mut canvas: Vec<Vec<String>> = vec![vec![" ".to_string(); canvas_width]];
+
         // Ensure we have enough rows
         for _ in canvas.len()..canvas_height {
             canvas.push(vec![" ".to_string(); layout.width.max(80)]);
         }
-        
+
         // Draw nodes
         for node in &diagram.nodes {
             if let Some(pos) = layout.positions.get(&node.id) {
                 self.draw_node(&mut canvas, pos, node.get_label());
             }
         }
-        
+
         // Draw edges
         for edge in &diagram.edges {
             if let (Some(from_pos), Some(to_pos)) = (
                 layout.positions.get(&edge.from),
-                layout.positions.get(&edge.to)
+                layout.positions.get(&edge.to),
             ) {
                 self.draw_edge(&mut canvas, from_pos, to_pos, edge.label.as_deref());
             }
         }
-        
+
         // Convert to string
         for row in &canvas {
             for cell in row {
@@ -95,10 +93,10 @@ impl Renderer {
             }
             output.push('\n');
         }
-        
+
         output
     }
-    
+
     fn render_sequence(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         if diagram.participants.is_empty() {
             return String::new();
@@ -135,8 +133,16 @@ impl Renderer {
         output.push_str("\n\n");
 
         for edge in &diagram.edges {
-            let from_idx = diagram.participants.iter().position(|p| p == &edge.from).unwrap_or(0);
-            let to_idx = diagram.participants.iter().position(|p| p == &edge.to).unwrap_or(0);
+            let from_idx = diagram
+                .participants
+                .iter()
+                .position(|p| p == &edge.from)
+                .unwrap_or(0);
+            let to_idx = diagram
+                .participants
+                .iter()
+                .position(|p| p == &edge.to)
+                .unwrap_or(0);
             let from_center = from_idx * lane_width + participant_width / 2;
             let to_center = to_idx * lane_width + participant_width / 2;
             let min_center = from_center.min(to_center);
@@ -148,13 +154,21 @@ impl Renderer {
                 overwrite_at(&mut line, from_center, arrow);
             } else if from_idx < to_idx {
                 if max_center > min_center + 1 {
-                    overwrite_at(&mut line, min_center + 1, &"─".repeat(max_center - min_center - 1));
+                    overwrite_at(
+                        &mut line,
+                        min_center + 1,
+                        &"─".repeat(max_center - min_center - 1),
+                    );
                 }
                 overwrite_at(&mut line, from_center, "├");
                 overwrite_at(&mut line, to_center, "▶");
             } else {
                 if max_center > min_center + 1 {
-                    overwrite_at(&mut line, min_center + 1, &"─".repeat(max_center - min_center - 1));
+                    overwrite_at(
+                        &mut line,
+                        min_center + 1,
+                        &"─".repeat(max_center - min_center - 1),
+                    );
                 }
                 overwrite_at(&mut line, from_center, "┤");
                 overwrite_at(&mut line, to_center, "◀");
@@ -170,7 +184,7 @@ impl Renderer {
 
         output
     }
-    
+
     fn render_class(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
         let mut output = String::new();
 
@@ -194,17 +208,17 @@ impl Renderer {
                 output.push('┌');
                 output.push_str(&"─".repeat(box_width));
                 output.push_str("┐\n");
-                
+
                 // Class name (centered)
                 output.push('│');
                 output.push_str(&self.pad_string(node.get_label(), box_width));
                 output.push_str("│\n");
-                
+
                 // Divider
                 output.push('├');
                 output.push_str(&"─".repeat(box_width));
                 output.push_str("┤\n");
-                
+
                 // Members - each on separate line
                 if node.members.is_empty() {
                     output.push('│');
@@ -228,7 +242,7 @@ impl Renderer {
                         output.push_str("│\n");
                     }
                 }
-                
+
                 // Bottom
                 output.push('└');
                 output.push_str(&"─".repeat(box_width));
@@ -236,7 +250,7 @@ impl Renderer {
                 output.push('\n');
             }
         }
-        
+
         // Draw relationships
         for rel in &diagram.relationships {
             let arrow = match rel.rel_type.as_str() {
@@ -250,87 +264,103 @@ impl Renderer {
             };
             output.push_str(&format!("{} {}\n", rel.from, arrow));
         }
-        
+
         output
     }
-    
+
     fn render_state(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
-        
+
         for edge in &diagram.edges {
-            let from = if edge.from == "[*]" { "●".to_string() } else { edge.from.clone() };
-            let to = if edge.to == "[*]" { "◉".to_string() } else { edge.to.clone() };
-            
+            let from = if edge.from == "[*]" {
+                "●".to_string()
+            } else {
+                edge.from.clone()
+            };
+            let to = if edge.to == "[*]" {
+                "◉".to_string()
+            } else {
+                edge.to.clone()
+            };
+
             output.push_str(&from);
             output.push_str(" ──▶ ");
             output.push_str(&to);
-            
+
             if let Some(label) = &edge.label {
                 output.push_str(&format!(" : {}", label));
             }
             output.push('\n');
         }
-        
+
         output
     }
-    
+
     fn render_pie(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
-        
+
         // Calculate total
-        let total: f64 = diagram.nodes.iter()
+        let total: f64 = diagram
+            .nodes
+            .iter()
             .map(|n| {
                 let parts: Vec<&str> = n.label.split(':').collect();
-                parts.get(1).and_then(|s| s.trim().parse::<f64>().ok()).unwrap_or(0.0)
+                parts
+                    .get(1)
+                    .and_then(|s| s.trim().parse::<f64>().ok())
+                    .unwrap_or(0.0)
             })
             .sum();
-        
+
         if total == 0.0 {
             return "No data to display".to_string();
         }
-        
+
         // Draw bar chart
         let max_bar_width = 40;
-        
+
         for node in &diagram.nodes {
             let parts: Vec<&str> = node.label.split(':').collect();
             let label_str = parts.first().copied().unwrap_or("");
-            let value: f64 = parts.get(1).and_then(|s| s.trim().parse::<f64>().ok()).unwrap_or(0.0);
-            
+            let value: f64 = parts
+                .get(1)
+                .and_then(|s| s.trim().parse::<f64>().ok())
+                .unwrap_or(0.0);
+
             let percentage = value / total;
             let bar_chars = (percentage * max_bar_width as f64) as usize;
-            
+
             output.push_str(label_str);
             output.push('┃');
             output.push_str(&"█".repeat(bar_chars));
             output.push_str(&format!(" {:.1}%\n", percentage * 100.0));
         }
-        
+
         output
     }
 
     fn render_er(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
-        
+
         // Render entities
         for entity in &diagram.entities {
             let box_width = self.calculate_er_box_width(entity);
-            
+
             // Top border
             output.push('┌');
             output.push_str(&"─".repeat(box_width));
             output.push_str("┐\n");
-            
+
             // Entity name (centered)
             output.push('│');
             output.push_str(&self.pad_string(&entity.name, box_width));
             output.push_str("│\n");
-            
+
             // Divider
             output.push('├');
             output.push_str(&"─".repeat(box_width));
             output.push_str("┤\n");
-            
+
             // Attributes
             for attr in &entity.attributes {
                 let pk_marker = if attr.is_primary_key { "PK" } else { "  " };
@@ -340,14 +370,14 @@ impl Renderer {
                 output.push_str(&self.pad_string_left(&attr_line, box_width));
                 output.push_str("│\n");
             }
-            
+
             // Bottom border
             output.push('└');
             output.push_str(&"─".repeat(box_width));
             output.push_str("┘\n");
             output.push('\n');
         }
-        
+
         // Render relationships
         for rel in &diagram.relationships {
             // Parse relationship type like "||--o{" into left and right cardinality
@@ -358,16 +388,20 @@ impl Renderer {
             } else {
                 ("--", "--")
             };
-            output.push_str(&format!("{} {}--{} {}\n", rel.from, left_card, right_card, rel.to));
+            output.push_str(&format!(
+                "{} {}--{} {}\n",
+                rel.from, left_card, right_card, rel.to
+            ));
         }
-        
+
         output
     }
-    
+
     fn calculate_er_box_width(&self, entity: &Entity) -> usize {
         let mut max_width = str_width(&entity.name);
         for attr in &entity.attributes {
-            let attr_str = format!("{}  {} : {}", 
+            let attr_str = format!(
+                "{}  {} : {}",
                 if attr.is_primary_key { "PK" } else { "  " },
                 if attr.is_foreign_key { "FK" } else { "  " },
                 attr.name
@@ -376,25 +410,25 @@ impl Renderer {
         }
         max_width.clamp(20, 50)
     }
-    
+
     fn draw_node(&self, canvas: &mut Vec<Vec<String>>, pos: &Position, label: &str) {
         let px = pos.x;
         let py = pos.y;
         let w = pos.width;
         let h = pos.height;
-        
+
         // Ensure canvas is large enough
         let required_height = py + h + 2;
         if canvas.len() < required_height {
             canvas.resize(required_height, vec![" ".to_string(); canvas[0].len()]);
         }
-        
+
         let chars = if self.ascii_only {
             BoxChars::ascii()
         } else {
             BoxChars::unicode()
         };
-        
+
         // Top border
         if px + w < canvas[0].len() {
             canvas[py][px] = chars.top_left.to_string();
@@ -403,7 +437,7 @@ impl Renderer {
             }
             canvas[py][px + w - 1] = chars.top_right.to_string();
         }
-        
+
         // Bottom border
         if py + h < canvas.len() && px + w < canvas[0].len() {
             canvas[py + h][px] = chars.bottom_left.to_string();
@@ -412,7 +446,7 @@ impl Renderer {
             }
             canvas[py + h][px + w - 1] = chars.bottom_right.to_string();
         }
-        
+
         // Vertical borders and content
         for y in (py + 1)..(py + h) {
             if y < canvas.len() && px < canvas[0].len() {
@@ -422,7 +456,7 @@ impl Renderer {
                 canvas[y][px + w - 1] = chars.vertical.to_string();
             }
         }
-        
+
         // Label (centered)
         let label_y = py + h / 2;
         if label_y < canvas.len() {
@@ -444,14 +478,20 @@ impl Renderer {
             }
         }
     }
-    
-    fn draw_edge(&self, canvas: &mut [Vec<String>], from: &Position, to: &Position, label: Option<&str>) {
+
+    fn draw_edge(
+        &self,
+        canvas: &mut [Vec<String>],
+        from: &Position,
+        to: &Position,
+        label: Option<&str>,
+    ) {
         // Manhattan-style edge routing (horizontal then vertical, or vice versa)
         let from_x = from.x + from.width;
         let from_y = from.y + from.height / 2;
         let to_x = to.x;
         let to_y = to.y + to.height / 2;
-        
+
         // Determine routing direction based on relative positions
         let dy = to_y.abs_diff(from_y);
         let dx = to_x.abs_diff(from_x);
@@ -462,7 +502,7 @@ impl Renderer {
             // Route horizontally first (default)
             (to_x, from_y, false)
         };
-        
+
         if vertical_first {
             // Vertical segment first, then horizontal
             // From -> mid point (vertical)
@@ -473,7 +513,7 @@ impl Renderer {
                     canvas[y][from_x] = if self.ascii_only { "|" } else { "│" }.to_string();
                 }
             }
-            
+
             // Horizontal segment
             let horiz_start = from_x.min(to_x);
             let horiz_end = from_x.max(to_x);
@@ -482,7 +522,7 @@ impl Renderer {
                     canvas[mid_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
                 }
             }
-            
+
             // Vertical segment to target (mid_y -> to_y)
             let vert_start = mid_y.min(to_y);
             let vert_end = mid_y.max(to_y);
@@ -501,7 +541,7 @@ impl Renderer {
                     canvas[from_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
                 }
             }
-            
+
             // Vertical segment
             let vert_start = from_y.min(to_y);
             let vert_end = from_y.max(to_y);
@@ -510,7 +550,7 @@ impl Renderer {
                     canvas[y][mid_x] = if self.ascii_only { "|" } else { "│" }.to_string();
                 }
             }
-            
+
             // Horizontal segment to target (mid_x -> to_x)
             let horiz_start = mid_x.min(to_x);
             let horiz_end = mid_x.max(to_x);
@@ -520,7 +560,7 @@ impl Renderer {
                 }
             }
         }
-        
+
         // Draw arrow head at destination
         if to_x > from_x {
             // Arrow pointing right
@@ -533,11 +573,15 @@ impl Renderer {
                 canvas[to_y][to_x + 1] = if self.ascii_only { "<" } else { "◀" }.to_string();
             }
         }
-        
+
         // Draw edge label if present
         if let Some(label_text) = label {
             let label_x = (from_x + to_x) / 2;
-            let label_y = if vertical_first { mid_y } else { (from_y + to_y) / 2 };
+            let label_y = if vertical_first {
+                mid_y
+            } else {
+                (from_y + to_y) / 2
+            };
             if label_y < canvas.len() {
                 let padded = self.pad_string(label_text, 8);
                 let mut current_x = label_x;
@@ -557,7 +601,7 @@ impl Renderer {
             }
         }
     }
-    
+
     fn pad_string(&self, s: &str, width: usize) -> String {
         self.pad_string_with_alignment(s, width, TextAlign::Center)
     }
@@ -639,7 +683,7 @@ impl BoxChars {
             vertical: '│',
         }
     }
-    
+
     fn ascii() -> Self {
         Self {
             top_left: '+',

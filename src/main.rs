@@ -2,11 +2,11 @@
 //! AI-friendly: designed for AI coding agents to use
 
 use clap::{Parser, ValueEnum, ValueHint};
+use meraid::{Theme, ThemeType};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
-use meraid::{Theme, ThemeType};
 
 #[derive(Parser)]
 #[command(name = "meraid")]
@@ -203,9 +203,8 @@ fn read_input(path: &Option<PathBuf>, json_mode: bool, theme: &str) -> anyhow::R
             io::stdin().read_to_string(&mut buf)?;
             Ok(buf)
         }
-        Some(p) => fs::read_to_string(p).map_err(|e| {
-            anyhow::anyhow!("cannot read '{}': {}", p.display(), e)
-        }),
+        Some(p) => fs::read_to_string(p)
+            .map_err(|e| anyhow::anyhow!("cannot read '{}': {}", p.display(), e)),
         None => {
             if io::stdin().is_terminal() {
                 let msg = "no input provided — pipe Mermaid source via stdin or pass a file path";
