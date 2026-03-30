@@ -220,7 +220,82 @@ A --> B
         
         assert!(!output.is_empty());
     }
+
+    #[test]
+    fn test_render_class_diagram_with_chinese_alignment() {
+        let source = r#"
+classDiagram
+class 用户服务 {
+    +获取用户
+    +更新资料
+}
+"#;
+        let diagram = parse_mermaid(source).unwrap();
+        let layout = Layout::new(&diagram).layout();
+        let theme = Theme::get(ThemeType::Default);
+        let renderer = Renderer::new(theme);
+        let output = renderer.render(&diagram, &layout);
+
+        assert!(output.contains("│    用户服务    │"));
+        assert!(output.contains("│+获取用户       │"));
+        assert!(output.contains("│+更新资料       │"));
+    }
+
+    #[test]
+    fn test_full_render_flowchart_with_chinese_label_keeps_borders_aligned() {
+        let source = "graph LR\n开始 --> 结束";
+        let diagram = parse_mermaid(source).unwrap();
+        let layout = Layout::new(&diagram).layout();
+        let theme = Theme::get(ThemeType::Default);
+        let renderer = Renderer::new(theme);
+        let output = renderer.render(&diagram, &layout);
+
+        assert!(output.contains("┌──────────┐"));
+        assert!(output.contains("│   开始   │"));
+        assert!(output.contains("└──────────┘"));
+    }
     
+    #[test]
+    fn test_sequence_diagram_with_chinese_and_mixed_text_alignment() {
+        let source = r#"
+sequenceDiagram
+participant 用户A
+participant API服务
+用户A->>API服务: 查询 user-详情
+API服务-->>用户A: 返回 成功OK
+"#;
+        let diagram = parse_mermaid(source).unwrap();
+        let layout = Layout::new(&diagram).layout();
+        let theme = Theme::get(ThemeType::Default);
+        let renderer = Renderer::new(theme);
+        let output = renderer.render(&diagram, &layout);
+
+        assert!(output.contains("用户A"));
+        assert!(output.contains("API服务"));
+        assert!(output.contains("│"));
+        assert!(output.contains("├─────────────────▶ 查询 user-详情"));
+        assert!(output.contains("◀───────────────────────────────────┤ 返回 成功OK"));
+    }
+
+    #[test]
+    fn test_state_diagram_with_chinese_and_mixed_text() {
+        let source = r#"
+stateDiagram-v2
+[*] --> 待处理
+待处理 --> 处理中: 开始 job-1
+处理中 --> 已完成: 完成 OK
+已完成 --> [*]
+"#;
+        let diagram = parse_mermaid(source).unwrap();
+        let layout = Layout::new(&diagram).layout();
+        let theme = Theme::get(ThemeType::Default);
+        let renderer = Renderer::new(theme);
+        let output = renderer.render(&diagram, &layout);
+
+        assert!(output.contains("待处理 ──▶ 处理中 : 开始 job-1"));
+        assert!(output.contains("处理中 ──▶ 已完成 : 完成 OK"));
+    }
+
     #[test]
     fn test_all_themes() {
         let source = "graph LR\nA --> B";

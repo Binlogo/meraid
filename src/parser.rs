@@ -221,21 +221,21 @@ fn parse_class(source: &str) -> anyhow::Result<Diagram> {
         diagram_type: DiagramType::Class,
         ..Default::default()
     };
-    
+
     let mut nodes: std::collections::HashMap<String, Node> = std::collections::HashMap::new();
     let mut relationships: Vec<Relationship> = Vec::new();
-    
-    // Join all lines for multi-line class body parsing
-    let _source_joined = source.replace("\n", " ");
-    
-    for line in source.lines() {
-        let line = line.trim();
-        
+    let lines: Vec<&str> = source.lines().collect();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let line = lines[i].trim();
+
         // Skip comments and empty lines
         if line.starts_with("%%") || line.is_empty() {
+            i += 1;
             continue;
         }
-        
+
         // Parse class definition with members (single or multi-line)
         if line.starts_with("class") && line.contains("{") {
             let class_name = line
@@ -243,32 +243,30 @@ fn parse_class(source: &str) -> anyhow::Result<Diagram> {
                 .nth(1)
                 .unwrap_or("")
                 .trim();
-            
+
             if !class_name.is_empty() {
-                // Check if it's a multi-line class (body ends on next line)
-                if line.matches('{').count() == line.matches('}').count() {
-                    // Single line class
-                    let members = parse_class_members(line);
-                    let mut node = Node::new(class_name, class_name);
-                    node.members = members;
-                    nodes.insert(class_name.to_string(), node);
-                } else {
-                    // Multi-line: need to find the closing brace in subsequent lines
-                    let rest_lines: Vec<&str> = source.lines()
-                        .skip_while(|l| !l.contains(class_name))
-                        .skip(1)
-                        .collect();
-                    let rest = rest_lines.join(" ");
-                    
-                    let full_def = format!("{} {}", line, rest);
-                    let members = parse_class_members(&full_def);
-                    let mut node = Node::new(class_name, class_name);
-                    node.members = members;
-                    nodes.insert(class_name.to_string(), node);
+                let mut full_def = line.to_string();
+                let mut brace_balance = line.matches('{').count() as isize - line.matches('}').count() as isize;
+
+                while brace_balance > 0 && i + 1 < lines.len() {
+                    i += 1;
+                    let next_line = lines[i].trim();
+                    full_def.push('\n');
+                    full_def.push_str(next_line);
+                    brace_balance += next_line.matches('{').count() as isize;
+                    brace_balance -= next_line.matches('}').count() as isize;
                 }
+
+                let members = parse_class_members(&full_def);
+                let mut node = Node::new(class_name, class_name);
+                node.members = members;
+                nodes.insert(class_name.to_string(), node);
             }
+
+            i += 1;
+            continue;
         }
-        
+
         // Parse relationships
         if line.contains("<|--") || line.contains("*--") || line.contains("o--") || 
            line.contains("--|") || line.contains("..>") || line.contains("..|>") {
@@ -305,6 +303,8 @@ fn parse_class(source: &str) -> anyhow::Result<Diagram> {
                 });
             }
         }
+
+        i += 1;
     }
     
     diagram.nodes = nodes.into_values().collect();
@@ -322,21 +322,20 @@ fn parse_class_members(class_def: &str) -> Vec<ClassMember> {
         let rest = &class_def[start+1..];
         // Find the matching closing brace
         let mut depth = 1;
-        let mut end = 0;
-        for (i, c) in rest.chars().enumerate() {
+        let mut end = None;
+        for (i, c) in rest.char_indices() {
             if c == '{' { depth += 1; }
             if c == '}' { depth -= 1; }
             if depth == 0 {
-                end = i;
+                end = Some(i);
                 break;
             }
         }
         
-        if end > 0 {
+        if let Some(end) = end {
             let body = &rest[..end];
             
-            // Split by } or { to get individual members
-            for line in body.split(&['}', '{'][..]) {
+            for line in body.lines() {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;

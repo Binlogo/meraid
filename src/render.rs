@@ -2,7 +2,7 @@
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::diagram::{Diagram, DiagramType, EdgeStyle, Entity, Node};
+use crate::diagram::{Diagram, DiagramType, Entity, Node};
 use crate::layout::{LayoutResult, Position};
 use crate::theme::Theme;
 
@@ -58,16 +58,17 @@ impl Renderer {
     fn render_flowchart(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
         let mut output = String::new();
         
-        // Create canvas
+        // Create canvas. Each column is a terminal cell, so use strings instead of chars
+        // to support wide characters like Chinese without stretching the box.
         let canvas_width = layout.width.max(80);
         let canvas_height = layout.height.max(20);
-        let mut canvas: Vec<Vec<char>> = vec![
-            vec![' '; canvas_width]
+        let mut canvas: Vec<Vec<String>> = vec![
+            vec![" ".to_string(); canvas_width]
         ];
         
         // Ensure we have enough rows
         for _ in canvas.len()..canvas_height {
-            canvas.push(vec![' '; layout.width.max(80)]);
+            canvas.push(vec![" ".to_string(); layout.width.max(80)]);
         }
         
         // Draw nodes
@@ -89,8 +90,8 @@ impl Renderer {
         
         // Convert to string
         for row in &canvas {
-            for ch in row {
-                output.push(*ch);
+            for cell in row {
+                output.push_str(cell);
             }
             output.push('\n');
         }
@@ -99,53 +100,74 @@ impl Renderer {
     }
     
     fn render_sequence(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
+        if diagram.participants.is_empty() {
+            return String::new();
+        }
+
         let mut output = String::new();
-        
-        // Draw participants
-        let participant_width = 12;
-        
-        // Header
+        let participant_width = diagram
+            .participants
+            .iter()
+            .map(|participant| str_width(participant))
+            .max()
+            .unwrap_or(0)
+            .max(8)
+            + 4;
+        let gap_width = 6;
+        let lane_width = participant_width + gap_width;
+
         for (i, participant) in diagram.participants.iter().enumerate() {
-            let _x = i * (participant_width + 6);
-            let padded = self.pad_string(participant, participant_width);
-            output.push_str(&format!("{:^width$}", padded, width = participant_width));
+            output.push_str(&self.pad_string(participant, participant_width));
             if i < diagram.participants.len() - 1 {
-                output.push_str("  ");
+                output.push_str(&" ".repeat(gap_width));
+            }
+        }
+        output.push('\n');
+
+        for (i, _) in diagram.participants.iter().enumerate() {
+            output.push_str(&" ".repeat(participant_width / 2));
+            output.push('│');
+            output.push_str(&" ".repeat(participant_width - participant_width / 2 - 1));
+            if i < diagram.participants.len() - 1 {
+                output.push_str(&" ".repeat(gap_width));
             }
         }
         output.push_str("\n\n");
-        
-        // Draw edges/messages
+
         for edge in &diagram.edges {
             let from_idx = diagram.participants.iter().position(|p| p == &edge.from).unwrap_or(0);
             let to_idx = diagram.participants.iter().position(|p| p == &edge.to).unwrap_or(0);
-            
-            let arrow_str = match edge.style {
-                EdgeStyle::Solid => "──▶",
-                EdgeStyle::Dotted => "┄┄▶",
-                _ => "──▶",
-            };
-            
-            if from_idx < to_idx {
-                // Left to right
-                output.push_str(&format!("{:>width$}", format!("──{}", arrow_str), width = from_idx * (participant_width + 2) + participant_width / 2));
+            let from_center = from_idx * lane_width + participant_width / 2;
+            let to_center = to_idx * lane_width + participant_width / 2;
+            let min_center = from_center.min(to_center);
+            let max_center = from_center.max(to_center);
+            let mut line = " ".repeat(max_center + 1);
+
+            if from_idx == to_idx {
+                let arrow = "↺";
+                overwrite_at(&mut line, from_center, arrow);
+            } else if from_idx < to_idx {
+                if max_center > min_center + 1 {
+                    overwrite_at(&mut line, min_center + 1, &"─".repeat(max_center - min_center - 1));
+                }
+                overwrite_at(&mut line, from_center, "├");
+                overwrite_at(&mut line, to_center, "▶");
             } else {
-                // Right to left
-                let reverse_arrow = match edge.style {
-                    EdgeStyle::Solid => "◀──",
-                    EdgeStyle::Dotted => "◀┄┄",
-                    _ => "◀──",
-                };
-                output.push_str(&format!("{:width$}", format!("{}{}", reverse_arrow, arrow_str), width = to_idx * (participant_width + 2) + participant_width / 2));
+                if max_center > min_center + 1 {
+                    overwrite_at(&mut line, min_center + 1, &"─".repeat(max_center - min_center - 1));
+                }
+                overwrite_at(&mut line, from_center, "┤");
+                overwrite_at(&mut line, to_center, "◀");
             }
-            
+
+            output.push_str(line.trim_end());
             if let Some(label) = &edge.label {
-                output.push_str(&format!(" {}\n", label));
-            } else {
-                output.push('\n');
+                output.push(' ');
+                output.push_str(label);
             }
+            output.push('\n');
         }
-        
+
         output
     }
     
@@ -175,7 +197,7 @@ impl Renderer {
                 
                 // Class name (centered)
                 output.push('│');
-                output.push_str(&format!("{:^width$}", node.get_label(), width = box_width));
+                output.push_str(&self.pad_string(node.get_label(), box_width));
                 output.push_str("│\n");
                 
                 // Divider
@@ -202,7 +224,7 @@ impl Renderer {
                         };
                         let member_str = format!("{}{}{}", prefix, member.name, suffix);
                         output.push('│');
-                        output.push_str(&format!("{:<width$}", member_str, width = box_width));
+                        output.push_str(&self.pad_string_left(&member_str, box_width));
                         output.push_str("│\n");
                     }
                 }
@@ -301,7 +323,7 @@ impl Renderer {
             
             // Entity name (centered)
             output.push('│');
-            output.push_str(&format!("{:^width$}", entity.name, width = box_width));
+            output.push_str(&self.pad_string(&entity.name, box_width));
             output.push_str("│\n");
             
             // Divider
@@ -315,7 +337,7 @@ impl Renderer {
                 let fk_marker = if attr.is_foreign_key { "FK" } else { "  " };
                 let attr_line = format!("{} {} : {}", pk_marker, fk_marker, attr.name);
                 output.push('│');
-                output.push_str(&format!("{:<width$}", attr_line, width = box_width));
+                output.push_str(&self.pad_string_left(&attr_line, box_width));
                 output.push_str("│\n");
             }
             
@@ -355,7 +377,7 @@ impl Renderer {
         max_width.clamp(20, 50)
     }
     
-    fn draw_node(&self, canvas: &mut Vec<Vec<char>>, pos: &Position, label: &str) {
+    fn draw_node(&self, canvas: &mut Vec<Vec<String>>, pos: &Position, label: &str) {
         let px = pos.x;
         let py = pos.y;
         let w = pos.width;
@@ -364,7 +386,7 @@ impl Renderer {
         // Ensure canvas is large enough
         let required_height = py + h + 2;
         if canvas.len() < required_height {
-            canvas.resize(required_height, vec![' '; canvas[0].len()]);
+            canvas.resize(required_height, vec![" ".to_string(); canvas[0].len()]);
         }
         
         let chars = if self.ascii_only {
@@ -375,29 +397,29 @@ impl Renderer {
         
         // Top border
         if px + w < canvas[0].len() {
-            canvas[py][px] = chars.top_left;
+            canvas[py][px] = chars.top_left.to_string();
             for _x in (px + 1)..(px + w - 1) {
-                canvas[py][_x] = chars.horizontal;
+                canvas[py][_x] = chars.horizontal.to_string();
             }
-            canvas[py][px + w - 1] = chars.top_right;
+            canvas[py][px + w - 1] = chars.top_right.to_string();
         }
         
         // Bottom border
         if py + h < canvas.len() && px + w < canvas[0].len() {
-            canvas[py + h][px] = chars.bottom_left;
+            canvas[py + h][px] = chars.bottom_left.to_string();
             for _x in (px + 1)..(px + w - 1) {
-                canvas[py + h][_x] = chars.horizontal;
+                canvas[py + h][_x] = chars.horizontal.to_string();
             }
-            canvas[py + h][px + w - 1] = chars.bottom_right;
+            canvas[py + h][px + w - 1] = chars.bottom_right.to_string();
         }
         
         // Vertical borders and content
         for y in (py + 1)..(py + h) {
             if y < canvas.len() && px < canvas[0].len() {
-                canvas[y][px] = chars.vertical;
+                canvas[y][px] = chars.vertical.to_string();
             }
             if y < canvas.len() && px + w - 1 < canvas[0].len() {
-                canvas[y][px + w - 1] = chars.vertical;
+                canvas[y][px + w - 1] = chars.vertical.to_string();
             }
         }
         
@@ -406,15 +428,24 @@ impl Renderer {
         if label_y < canvas.len() {
             let label_x = px + 1;
             let padded = self.pad_string(label, w - 2);
-            for (i, ch) in padded.chars().enumerate() {
-                if label_x + i < canvas[0].len() {
-                    canvas[label_y][label_x + i] = ch;
+            let mut current_x = label_x;
+            for ch in padded.chars() {
+                let cell_width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
+                if current_x >= canvas[0].len() {
+                    break;
                 }
+                canvas[label_y][current_x] = ch.to_string();
+                for offset in 1..cell_width {
+                    if current_x + offset < canvas[0].len() {
+                        canvas[label_y][current_x + offset].clear();
+                    }
+                }
+                current_x += cell_width;
             }
         }
     }
     
-    fn draw_edge(&self, canvas: &mut [Vec<char>], from: &Position, to: &Position, label: Option<&str>) {
+    fn draw_edge(&self, canvas: &mut [Vec<String>], from: &Position, to: &Position, label: Option<&str>) {
         // Manhattan-style edge routing (horizontal then vertical, or vice versa)
         let from_x = from.x + from.width;
         let from_y = from.y + from.height / 2;
@@ -439,7 +470,7 @@ impl Renderer {
             let vert_end = from_y.max(mid_y);
             for y in (vert_start + 1)..vert_end {
                 if y < canvas.len() && from_x < canvas[0].len() {
-                    canvas[y][from_x] = if self.ascii_only { '|' } else { '│' };
+                    canvas[y][from_x] = if self.ascii_only { "|" } else { "│" }.to_string();
                 }
             }
             
@@ -448,7 +479,7 @@ impl Renderer {
             let horiz_end = from_x.max(to_x);
             for x in (horiz_start + 1)..horiz_end {
                 if mid_y < canvas.len() && x < canvas[0].len() {
-                    canvas[mid_y][x] = if self.ascii_only { '-' } else { '─' };
+                    canvas[mid_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
                 }
             }
             
@@ -457,7 +488,7 @@ impl Renderer {
             let vert_end = mid_y.max(to_y);
             for y in (vert_start + 1)..vert_end {
                 if y < canvas.len() && to_x < canvas[0].len() {
-                    canvas[y][to_x] = if self.ascii_only { '|' } else { '│' };
+                    canvas[y][to_x] = if self.ascii_only { "|" } else { "│" }.to_string();
                 }
             }
         } else {
@@ -467,7 +498,7 @@ impl Renderer {
             let horiz_end = from_x.max(mid_x);
             for x in (horiz_start + 1)..horiz_end {
                 if from_y < canvas.len() && x < canvas[0].len() {
-                    canvas[from_y][x] = if self.ascii_only { '-' } else { '─' };
+                    canvas[from_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
                 }
             }
             
@@ -476,7 +507,7 @@ impl Renderer {
             let vert_end = from_y.max(to_y);
             for y in (vert_start + 1)..vert_end {
                 if y < canvas.len() && mid_x < canvas[0].len() {
-                    canvas[y][mid_x] = if self.ascii_only { '|' } else { '│' };
+                    canvas[y][mid_x] = if self.ascii_only { "|" } else { "│" }.to_string();
                 }
             }
             
@@ -485,7 +516,7 @@ impl Renderer {
             let horiz_end = mid_x.max(to_x);
             for x in (horiz_start + 1)..horiz_end {
                 if to_y < canvas.len() && x < canvas[0].len() {
-                    canvas[to_y][x] = if self.ascii_only { '-' } else { '─' };
+                    canvas[to_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
                 }
             }
         }
@@ -494,12 +525,12 @@ impl Renderer {
         if to_x > from_x {
             // Arrow pointing right
             if to_y < canvas.len() && to_x > 0 && to_x < canvas[0].len() {
-                canvas[to_y][to_x - 1] = if self.ascii_only { '>' } else { '▶' };
+                canvas[to_y][to_x - 1] = if self.ascii_only { ">" } else { "▶" }.to_string();
             }
         } else if to_x < from_x {
             // Arrow pointing left
             if to_y < canvas.len() && to_x + 1 < canvas[0].len() {
-                canvas[to_y][to_x + 1] = if self.ascii_only { '<' } else { '◀' };
+                canvas[to_y][to_x + 1] = if self.ascii_only { "<" } else { "◀" }.to_string();
             }
         }
         
@@ -509,36 +540,82 @@ impl Renderer {
             let label_y = if vertical_first { mid_y } else { (from_y + to_y) / 2 };
             if label_y < canvas.len() {
                 let padded = self.pad_string(label_text, 8);
-                for (i, ch) in padded.chars().enumerate() {
-                    if label_x + i < canvas[0].len() {
-                        canvas[label_y][label_x + i] = ch;
+                let mut current_x = label_x;
+                for ch in padded.chars() {
+                    let cell_width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
+                    if current_x >= canvas[0].len() {
+                        break;
                     }
+                    canvas[label_y][current_x] = ch.to_string();
+                    for offset in 1..cell_width {
+                        if current_x + offset < canvas[0].len() {
+                            canvas[label_y][current_x + offset].clear();
+                        }
+                    }
+                    current_x += cell_width;
                 }
             }
         }
     }
     
     fn pad_string(&self, s: &str, width: usize) -> String {
-        let s_width = str_width(s);
+        self.pad_string_with_alignment(s, width, TextAlign::Center)
+    }
+
+    fn pad_string_left(&self, s: &str, width: usize) -> String {
+        self.pad_string_with_alignment(s, width, TextAlign::Left)
+    }
+
+    fn pad_string_with_alignment(&self, s: &str, width: usize, align: TextAlign) -> String {
+        let truncated = truncate_to_width(s, width);
+        let s_width = str_width(&truncated);
+
         if s_width >= width {
-            // Truncate to display width
-            let mut result = String::new();
-            let mut current_width = 0;
-            for c in s.chars() {
-                let c_width = UnicodeWidthChar::width(c).unwrap_or(1);
-                if current_width + c_width > width {
-                    break;
-                }
-                result.push(c);
-                current_width += c_width;
+            return truncated;
+        }
+
+        let padding = width - s_width;
+        match align {
+            TextAlign::Left => format!("{}{}", truncated, " ".repeat(padding)),
+            TextAlign::Center => {
+                let left = padding / 2;
+                let right = padding - left;
+                format!("{}{}{}", " ".repeat(left), truncated, " ".repeat(right))
             }
-            result
-        } else {
-            let left = (width - s_width) / 2;
-            let right = width - s_width - left;
-            format!("{}{}{}", " ".repeat(left), s, " ".repeat(right))
         }
     }
+}
+
+fn truncate_to_width(s: &str, width: usize) -> String {
+    let mut result = String::new();
+    let mut current_width = 0;
+
+    for c in s.chars() {
+        let c_width = UnicodeWidthChar::width(c).unwrap_or(1);
+        if current_width + c_width > width {
+            break;
+        }
+        result.push(c);
+        current_width += c_width;
+    }
+
+    result
+}
+
+fn overwrite_at(line: &mut String, start: usize, content: &str) {
+    let mut chars: Vec<char> = line.chars().collect();
+    for (i, ch) in content.chars().enumerate() {
+        if start + i < chars.len() {
+            chars[start + i] = ch;
+        }
+    }
+    *line = chars.into_iter().collect();
+}
+
+#[derive(Clone, Copy)]
+enum TextAlign {
+    Left,
+    Center,
 }
 
 /// Box drawing characters

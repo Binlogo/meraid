@@ -1,0 +1,22 @@
+classDiagram
+    class 用户 {
+        +String 姓名
+        +String 邮箱
+        +int 年龄
+        +登录()
+        +注销()
+    }
+    class 管理员 {
+        +String 权限级别
+        +管理用户()
+        +查看日志()
+    }
+    class 订单 {
+        +int 订单编号
+        +float 金额
+        +String 状态
+        +提交()
+        +取消()
+    }
+    用户 <|-- 管理员
+    用户 "1" --> "0..*" 订单
