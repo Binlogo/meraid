@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "cli-design": {
+      "source": "Binlogo/ferrite",
+      "sourceType": "github",
+      "computedHash": "35dcc7d333a1b43599de10ccfe2fe51d04c7b3a36aa03e14e8d4b3aec792a2e5"
+    }
+  }
+}
