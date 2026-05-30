@@ -47,11 +47,14 @@ graph LR
 EOF
 ```
 
-### Available themes
+### Available theme palettes
 
-- `default` - Cyan nodes, yellow arrows
-- `terra` - Warm colors (brown, orange)
-- `neon` - Magenta nodes, green arrows (cyberpunk)
+`--theme` selects one of these palettes. Note: colored ANSI output is planned
+for 0.3 — current output is monochrome regardless of theme.
+
+- `default` - Default terminal colors
+- `terra` - Warm earth tones (brown, orange)
+- `neon` - Cyberpunk magenta/green
 - `mono` - Grayscale
 - `amber` - Amber CRT style
 - `phosphor` - Green phosphor tube style

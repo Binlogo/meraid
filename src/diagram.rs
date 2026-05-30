@@ -113,6 +113,19 @@ impl Default for Diagram {
     }
 }
 
+impl Diagram {
+    /// Returns `true` when nothing meaningful was parsed (no nodes, edges,
+    /// relationships, participants, or entities). Used to surface an error for
+    /// empty or unrecognized input instead of rendering a blank canvas.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+            && self.edges.is_empty()
+            && self.relationships.is_empty()
+            && self.participants.is_empty()
+            && self.entities.is_empty()
+    }
+}
+
 /// ER Diagram entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entity {
