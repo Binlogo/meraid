@@ -1,0 +1,15 @@
+classDiagram
+    class Shape {
+        +String name
+        +area() float
+    }
+    class Circle {
+        +float radius
+        +area() float
+    }
+    class Square {
+        +float side
+        +area() float
+    }
+    Shape <|-- Circle
+    Shape <|-- Square
