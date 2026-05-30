@@ -273,8 +273,9 @@ API服务-->>用户A: 返回 成功OK
         assert!(output.contains("用户A"));
         assert!(output.contains("API服务"));
         assert!(output.contains("│"));
+        // Solid arrow for `->>`, dashed arrow for `-->>`.
         assert!(output.contains("├─────────────────▶ 查询 user-详情"));
-        assert!(output.contains("◀───────────────────────────────────┤ 返回 成功OK"));
+        assert!(output.contains("◀┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ 返回 成功OK"));
     }
 
     #[test]
@@ -359,16 +360,16 @@ stateDiagram-v2
 
     #[test]
     fn test_empty_source() {
+        // Empty input now surfaces an error instead of a blank canvas.
         let result = parse_mermaid("");
-        assert!(result.is_ok());
+        assert!(result.is_err());
     }
 
     #[test]
     fn test_only_comments() {
+        // A source with only comments parses to nothing, so it errors.
         let source = "%% comment only";
-        let diagram = parse_mermaid(source).unwrap();
-        // Should default to flowchart with no nodes
-        assert_eq!(diagram.diagram_type, DiagramType::Flowchart);
+        assert!(parse_mermaid(source).is_err());
     }
 
     #[test]

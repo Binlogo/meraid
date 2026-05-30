@@ -42,6 +42,15 @@ impl Renderer {
         self
     }
 
+    /// Box-drawing glyph set for the current mode (ASCII or Unicode).
+    fn box_chars(&self) -> BoxChars {
+        if self.ascii_only {
+            BoxChars::ascii()
+        } else {
+            BoxChars::unicode()
+        }
+    }
+
     /// Render diagram to string
     pub fn render(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
         match diagram.diagram_type {
@@ -114,6 +123,16 @@ impl Renderer {
         let gap_width = 6;
         let lane_width = participant_width + gap_width;
 
+        // Glyphs, ASCII-aware.
+        let vbar = if self.ascii_only { "|" } else { "│" };
+        let solid = if self.ascii_only { "-" } else { "─" };
+        let dashed = if self.ascii_only { "." } else { "┄" };
+        let head_right = if self.ascii_only { ">" } else { "▶" };
+        let head_left = if self.ascii_only { "<" } else { "◀" };
+        let conn_from = if self.ascii_only { "|" } else { "├" };
+        let conn_to = if self.ascii_only { "|" } else { "┤" };
+        let self_msg = if self.ascii_only { "@" } else { "↺" };
+
         for (i, participant) in diagram.participants.iter().enumerate() {
             output.push_str(&self.pad_string(participant, participant_width));
             if i < diagram.participants.len() - 1 {
@@ -124,7 +143,7 @@ impl Renderer {
 
         for (i, _) in diagram.participants.iter().enumerate() {
             output.push_str(&" ".repeat(participant_width / 2));
-            output.push('│');
+            output.push_str(vbar);
             output.push_str(&" ".repeat(participant_width - participant_width / 2 - 1));
             if i < diagram.participants.len() - 1 {
                 output.push_str(&" ".repeat(gap_width));
@@ -147,37 +166,43 @@ impl Renderer {
             let to_center = to_idx * lane_width + participant_width / 2;
             let min_center = from_center.min(to_center);
             let max_center = from_center.max(to_center);
+            let line_char = if edge.style == crate::diagram::EdgeStyle::Dotted {
+                dashed
+            } else {
+                solid
+            };
             let mut line = " ".repeat(max_center + 1);
 
             if from_idx == to_idx {
-                let arrow = "↺";
-                overwrite_at(&mut line, from_center, arrow);
+                overwrite_at(&mut line, from_center, self_msg);
             } else if from_idx < to_idx {
                 if max_center > min_center + 1 {
                     overwrite_at(
                         &mut line,
                         min_center + 1,
-                        &"─".repeat(max_center - min_center - 1),
+                        &line_char.repeat(max_center - min_center - 1),
                     );
                 }
-                overwrite_at(&mut line, from_center, "├");
-                overwrite_at(&mut line, to_center, "▶");
+                overwrite_at(&mut line, from_center, conn_from);
+                overwrite_at(&mut line, to_center, head_right);
             } else {
                 if max_center > min_center + 1 {
                     overwrite_at(
                         &mut line,
                         min_center + 1,
-                        &"─".repeat(max_center - min_center - 1),
+                        &line_char.repeat(max_center - min_center - 1),
                     );
                 }
-                overwrite_at(&mut line, from_center, "┤");
-                overwrite_at(&mut line, to_center, "◀");
+                overwrite_at(&mut line, from_center, conn_to);
+                overwrite_at(&mut line, to_center, head_left);
             }
 
             output.push_str(line.trim_end());
             if let Some(label) = &edge.label {
-                output.push(' ');
-                output.push_str(label);
+                if !label.is_empty() {
+                    output.push(' ');
+                    output.push_str(label);
+                }
             }
             output.push('\n');
         }
@@ -185,84 +210,106 @@ impl Renderer {
         output
     }
 
-    fn render_class(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
+    fn render_class(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
+        let chars = self.box_chars();
+        let (div_l, div_r) = if self.ascii_only {
+            ('+', '+')
+        } else {
+            ('├', '┤')
+        };
+
+        let member_line = |member: &crate::diagram::ClassMember| -> String {
+            let prefix = match member.visibility {
+                crate::diagram::Visibility::Public => "+",
+                crate::diagram::Visibility::Private => "-",
+                crate::diagram::Visibility::Protected => "#",
+                crate::diagram::Visibility::Package => "~",
+            };
+            let suffix = match member.member_type {
+                crate::diagram::MemberType::Field => "",
+                crate::diagram::MemberType::Method => "()",
+            };
+            format!("{}{}{}", prefix, member.name, suffix)
+        };
 
         for node in &diagram.nodes {
-            if let Some(_pos) = layout.positions.get(&node.id) {
-                // Calculate box width based on content (using display width for CJK support)
-                let mut max_width = str_width(node.get_label());
-                for member in &node.members {
-                    let prefix = match member.visibility {
-                        crate::diagram::Visibility::Public => "+",
-                        crate::diagram::Visibility::Private => "-",
-                        crate::diagram::Visibility::Protected => "#",
-                        crate::diagram::Visibility::Package => "~",
-                    };
-                    let member_str = format!("{} {}", prefix, member.name);
-                    max_width = max_width.max(str_width(&member_str));
-                }
-                let box_width = max_width.clamp(16, 40);
-
-                // Draw class box top
-                output.push('┌');
-                output.push_str(&"─".repeat(box_width));
-                output.push_str("┐\n");
-
-                // Class name (centered)
-                output.push('│');
-                output.push_str(&self.pad_string(node.get_label(), box_width));
-                output.push_str("│\n");
-
-                // Divider
-                output.push('├');
-                output.push_str(&"─".repeat(box_width));
-                output.push_str("┤\n");
-
-                // Members - each on separate line
-                if node.members.is_empty() {
-                    output.push('│');
-                    output.push_str(&" ".repeat(box_width));
-                    output.push_str("│\n");
-                } else {
-                    for member in &node.members {
-                        let prefix = match member.visibility {
-                            crate::diagram::Visibility::Public => "+",
-                            crate::diagram::Visibility::Private => "-",
-                            crate::diagram::Visibility::Protected => "#",
-                            crate::diagram::Visibility::Package => "~",
-                        };
-                        let suffix = match member.member_type {
-                            crate::diagram::MemberType::Field => "",
-                            crate::diagram::MemberType::Method => "()",
-                        };
-                        let member_str = format!("{}{}{}", prefix, member.name, suffix);
-                        output.push('│');
-                        output.push_str(&self.pad_string_left(&member_str, box_width));
-                        output.push_str("│\n");
-                    }
-                }
-
-                // Bottom
-                output.push('└');
-                output.push_str(&"─".repeat(box_width));
-                output.push_str("┘\n");
-                output.push('\n');
+            // Box width based on content (display width for CJK support).
+            let mut max_width = str_width(node.get_label());
+            for member in &node.members {
+                max_width = max_width.max(str_width(&member_line(member)));
             }
+            let box_width = max_width.clamp(16, 40);
+
+            let horizontal: String = chars.horizontal.to_string().repeat(box_width);
+
+            // Top border.
+            output.push(chars.top_left);
+            output.push_str(&horizontal);
+            output.push(chars.top_right);
+            output.push('\n');
+
+            // Class name (centered).
+            output.push(chars.vertical);
+            output.push_str(&self.pad_string(node.get_label(), box_width));
+            output.push(chars.vertical);
+            output.push('\n');
+
+            // Divider between name and members.
+            output.push(div_l);
+            output.push_str(&horizontal);
+            output.push(div_r);
+            output.push('\n');
+
+            let fields: Vec<_> = node
+                .members
+                .iter()
+                .filter(|m| m.member_type == crate::diagram::MemberType::Field)
+                .collect();
+            let methods: Vec<_> = node
+                .members
+                .iter()
+                .filter(|m| m.member_type == crate::diagram::MemberType::Method)
+                .collect();
+
+            if node.members.is_empty() {
+                output.push(chars.vertical);
+                output.push_str(&" ".repeat(box_width));
+                output.push(chars.vertical);
+                output.push('\n');
+            } else {
+                for &member in &fields {
+                    output.push(chars.vertical);
+                    output.push_str(&self.pad_string_left(&member_line(member), box_width));
+                    output.push(chars.vertical);
+                    output.push('\n');
+                }
+                // Second divider between fields and methods.
+                if !fields.is_empty() && !methods.is_empty() {
+                    output.push(div_l);
+                    output.push_str(&horizontal);
+                    output.push(div_r);
+                    output.push('\n');
+                }
+                for &member in &methods {
+                    output.push(chars.vertical);
+                    output.push_str(&self.pad_string_left(&member_line(member), box_width));
+                    output.push(chars.vertical);
+                    output.push('\n');
+                }
+            }
+
+            // Bottom border.
+            output.push(chars.bottom_left);
+            output.push_str(&horizontal);
+            output.push(chars.bottom_right);
+            output.push('\n');
+            output.push('\n');
         }
 
-        // Draw relationships
+        // Relationships as a text legend, including both endpoints.
         for rel in &diagram.relationships {
-            let arrow = match rel.rel_type.as_str() {
-                "<|--" => "◄───",
-                "*--" => "●───",
-                "o--" => "○───",
-                "--|>" => "───►",
-                "..>" => "····▶",
-                "..|>" => "····►",
-                _ => "───",
-            };
-            output.push_str(&format!("{} {}\n", rel.from, arrow));
+            output.push_str(&format!("{} {} {}\n", rel.from, rel.rel_type, rel.to));
         }
 
         output
@@ -271,21 +318,29 @@ impl Renderer {
     fn render_state(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
 
+        let arrow = if self.ascii_only {
+            " -> "
+        } else {
+            " ──▶ "
+        };
+        let start_marker = if self.ascii_only { "(*)" } else { "●" };
+        let end_marker = if self.ascii_only { "(o)" } else { "◉" };
+
         for edge in &diagram.edges {
             let from = if edge.from == "[*]" {
-                "●".to_string()
+                start_marker
             } else {
-                edge.from.clone()
+                edge.from.as_str()
             };
             let to = if edge.to == "[*]" {
-                "◉".to_string()
+                end_marker
             } else {
-                edge.to.clone()
+                edge.to.as_str()
             };
 
-            output.push_str(&from);
-            output.push_str(" ──▶ ");
-            output.push_str(&to);
+            output.push_str(from);
+            output.push_str(arrow);
+            output.push_str(to);
 
             if let Some(label) = &edge.label {
                 output.push_str(&format!(" : {}", label));
@@ -297,42 +352,42 @@ impl Renderer {
     }
 
     fn render_pie(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
-        let mut output = String::new();
-
-        // Calculate total
-        let total: f64 = diagram
+        // Each pie node stores its label as "label: value"; split on the LAST
+        // colon so quoted labels containing ':' are preserved. Negative values
+        // are clamped to zero.
+        let slices: Vec<(String, f64)> = diagram
             .nodes
             .iter()
-            .map(|n| {
-                let parts: Vec<&str> = n.label.split(':').collect();
-                parts
-                    .get(1)
-                    .and_then(|s| s.trim().parse::<f64>().ok())
-                    .unwrap_or(0.0)
+            .map(|n| match n.label.rsplit_once(':') {
+                Some((label, value)) => (
+                    label.trim().to_string(),
+                    value.trim().parse::<f64>().unwrap_or(0.0).max(0.0),
+                ),
+                None => (n.label.clone(), 0.0),
             })
-            .sum();
+            .collect();
 
+        let total: f64 = slices.iter().map(|(_, v)| v).sum();
         if total == 0.0 {
-            return "No data to display".to_string();
+            return "No data to display\n".to_string();
         }
 
-        // Draw bar chart
+        let label_width = slices.iter().map(|(l, _)| str_width(l)).max().unwrap_or(0);
         let max_bar_width = 40;
+        let bar_char = if self.ascii_only { '#' } else { '█' };
+        let separator = if self.ascii_only { '|' } else { '┃' };
 
-        for node in &diagram.nodes {
-            let parts: Vec<&str> = node.label.split(':').collect();
-            let label_str = parts.first().copied().unwrap_or("");
-            let value: f64 = parts
-                .get(1)
-                .and_then(|s| s.trim().parse::<f64>().ok())
-                .unwrap_or(0.0);
-
+        let mut output = String::new();
+        for (label, value) in &slices {
             let percentage = value / total;
-            let bar_chars = (percentage * max_bar_width as f64) as usize;
+            let bar_chars =
+                ((percentage * max_bar_width as f64).round() as usize).min(max_bar_width);
 
-            output.push_str(label_str);
-            output.push('┃');
-            output.push_str(&"█".repeat(bar_chars));
+            // Right-align labels so the separators and bars line up.
+            output.push_str(&" ".repeat(label_width.saturating_sub(str_width(label))));
+            output.push_str(label);
+            output.push(separator);
+            output.push_str(&bar_char.to_string().repeat(bar_chars));
             output.push_str(&format!(" {:.1}%\n", percentage * 100.0));
         }
 
@@ -342,39 +397,52 @@ impl Renderer {
     fn render_er(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
 
+        let chars = self.box_chars();
+        let (div_l, div_r) = if self.ascii_only {
+            ('+', '+')
+        } else {
+            ('├', '┤')
+        };
+
         // Render entities
         for entity in &diagram.entities {
             let box_width = self.calculate_er_box_width(entity);
+            let horizontal: String = chars.horizontal.to_string().repeat(box_width);
 
             // Top border
-            output.push('┌');
-            output.push_str(&"─".repeat(box_width));
-            output.push_str("┐\n");
+            output.push(chars.top_left);
+            output.push_str(&horizontal);
+            output.push(chars.top_right);
+            output.push('\n');
 
             // Entity name (centered)
-            output.push('│');
+            output.push(chars.vertical);
             output.push_str(&self.pad_string(&entity.name, box_width));
-            output.push_str("│\n");
+            output.push(chars.vertical);
+            output.push('\n');
 
             // Divider
-            output.push('├');
-            output.push_str(&"─".repeat(box_width));
-            output.push_str("┤\n");
+            output.push(div_l);
+            output.push_str(&horizontal);
+            output.push(div_r);
+            output.push('\n');
 
             // Attributes
             for attr in &entity.attributes {
                 let pk_marker = if attr.is_primary_key { "PK" } else { "  " };
                 let fk_marker = if attr.is_foreign_key { "FK" } else { "  " };
                 let attr_line = format!("{} {} : {}", pk_marker, fk_marker, attr.name);
-                output.push('│');
+                output.push(chars.vertical);
                 output.push_str(&self.pad_string_left(&attr_line, box_width));
-                output.push_str("│\n");
+                output.push(chars.vertical);
+                output.push('\n');
             }
 
             // Bottom border
-            output.push('└');
-            output.push_str(&"─".repeat(box_width));
-            output.push_str("┘\n");
+            output.push(chars.bottom_left);
+            output.push_str(&horizontal);
+            output.push(chars.bottom_right);
+            output.push('\n');
             output.push('\n');
         }
 
@@ -401,7 +469,7 @@ impl Renderer {
         let mut max_width = str_width(&entity.name);
         for attr in &entity.attributes {
             let attr_str = format!(
-                "{}  {} : {}",
+                "{} {} : {}",
                 if attr.is_primary_key { "PK" } else { "  " },
                 if attr.is_foreign_key { "FK" } else { "  " },
                 attr.name
@@ -574,26 +642,32 @@ impl Renderer {
             }
         }
 
-        // Draw edge label if present
-        if let Some(label_text) = label {
-            let label_x = (from_x + to_x) / 2;
+        // Draw edge label if present. Write only onto empty cells or the edge's
+        // own line glyphs so the label never garbles a node box or its text.
+        if let Some(label_text) = label.filter(|l| !l.is_empty()) {
             let label_y = if vertical_first {
                 mid_y
             } else {
                 (from_y + to_y) / 2
             };
+            let label_x = from_x.min(to_x) + 1;
             if label_y < canvas.len() {
-                let padded = self.pad_string(label_text, 8);
                 let mut current_x = label_x;
-                for ch in padded.chars() {
+                for ch in label_text.chars() {
                     let cell_width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
                     if current_x >= canvas[0].len() {
                         break;
                     }
-                    canvas[label_y][current_x] = ch.to_string();
-                    for offset in 1..cell_width {
-                        if current_x + offset < canvas[0].len() {
-                            canvas[label_y][current_x + offset].clear();
+                    let overwritable = matches!(
+                        canvas[label_y][current_x].as_str(),
+                        " " | "─" | "│" | "-" | "|"
+                    );
+                    if overwritable {
+                        canvas[label_y][current_x] = ch.to_string();
+                        for offset in 1..cell_width {
+                            if current_x + offset < canvas[0].len() {
+                                canvas[label_y][current_x + offset].clear();
+                            }
                         }
                     }
                     current_x += cell_width;

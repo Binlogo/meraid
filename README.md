@@ -21,49 +21,52 @@
   </a>
 </p>
 
+[简体中文](README-zh.md)
+
 ## Features
 
-- **Pure Rust implementation** — Zero external dependencies, blazing fast, fully portable
-- **AI-friendly** — JSON output mode for programmatic parsing, perfect for AI coding agents
-- **5+ diagram types** — Flowcharts, sequence diagrams, class diagrams, state diagrams, pie charts
-- **6 color themes** — default, terra, neon, mono, amber, phosphor
-- **ASCII fallback** — Works on any terminal, even the most basic ones
-- **Pipe-friendly CLI** — `cat diagram.mmd | meraid` just works
+- **Self-contained** — pure Rust with a small, well-known dependency set. No
+  browser, no Node, no external Mermaid service.
+- **AI-friendly** — `--format json` returns the rendered diagram plus metadata,
+  with machine-parseable errors. Handy for AI coding agents.
+- **6 diagram types** — flowcharts, sequence, class, state, pie, and ER diagrams.
+- **ASCII fallback** — `--ascii` works on any terminal, even the most basic ones.
+- **Pipe-friendly CLI** — `cat diagram.mmd | meraid` just works.
+- **CJK-aware** — Chinese/Japanese/Korean text keeps box borders aligned.
 
-## Why Meraid?
+> Theme palettes are selectable today (`--theme`), but colored ANSI output is on
+> the [roadmap](#roadmap) for 0.3 — current output is monochrome.
 
-Mermaid is excellent for documentation, but rendering it typically requires a browser or external service. Meraid brings Mermaid rendering directly to your terminal — perfect for SSH sessions, CI logs, TUI applications, or any environment with Rust.
+## Why meraid?
 
-Built with love for the Rust ecosystem, providing a fast, dependency-free alternative to existing solutions.
+Mermaid is excellent for documentation, but rendering it usually requires a
+browser or an external service. meraid renders Mermaid directly in your
+terminal — perfect for SSH sessions, CI logs, TUI applications, or any
+environment with Rust. It's a fast, self-contained alternative for terminal use.
 
 ## Install
 
-### From Git (Recommended - Latest)
-
-```bash
-cargo install --git https://github.com/Binlogo/meraid.git
-```
-
-### From Source
-
-```bash
-git clone https://github.com/Binlogo/meraid.git
-cd meraid
-cargo build --release
-cargo install --path .
-```
-
-### From Crates.io (Coming Soon)
+### From Crates.io
 
 ```bash
 cargo install meraid
 ```
 
-### With Homebrew (coming soon)
+### From Git (latest)
 
 ```bash
-brew install meraid
+cargo install --git https://github.com/Binlogo/meraid.git
 ```
+
+### From source
+
+```bash
+git clone https://github.com/Binlogo/meraid.git
+cd meraid
+cargo install --path .
+```
+
+> Homebrew support is planned but not yet available.
 
 ## Quick Start
 
@@ -76,7 +79,7 @@ meraid diagram.mmd
 # Render from stdin
 echo "graph LR; A-->B-->C" | meraid
 
-# Use a theme
+# Select a theme palette
 meraid diagram.mmd --theme neon
 
 # ASCII-only output
@@ -99,52 +102,31 @@ fn main() {
 
 ## Supported Diagram Types
 
+The output blocks below are produced by the binary itself.
+
 ### Flowcharts
 
-All directions supported: `LR`, `RL`, `TD`/`TB`, `BT`.
-
 ````mermaid
-graph TD
-    A[Start] --> B{Is valid?}
-    B -->|Yes| C(Process)
-    C --> D([Done])
-    B -->|No| E[Error]
+graph LR
+    A[Start] --> B[Process] --> C[Done]
 ````
 
 ```
-┌─────────────┐
-│             │
-│    Start    │
-│             │
-└──────┬──────┘
-       │
-       ▼
-┌──────◇──────┐
-│             │
-│  Is valid?  │
-│             │
-└──────◇──────┘
-       │
-       ╰──────────────────╮
-    Yes│                  │No
-       ▼                  ▼
-╭─────────────╮    ┌─────────────┐
-│             │    │             │
-│   Process   │    │    Error    │
-│             │    │             │
-╰──────┬──────╯    └─────────────┘
-       │
-       ▼
-╭─────────────╮
-(             )
-(    Done     )
-(             )
-╰─────────────╯
+┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Start   │ ──▶│ Process  │ ──▶│   Done   │
+│          │    │          │    │          │
+└──────────┘    └──────────┘    └──────────┘
 ```
 
-**Node shapes:** rectangle `[text]`, rounded `(text)`, diamond `{text}`, stadium `([text])`, subroutine `[[text]]`
-
-**Edge styles:** solid `-->`, dotted `-.->`, thick `==>`, labeled `-->|text|`
+- **Node shapes** are parsed — rectangle `[text]`, rounded `(text)`, diamond
+  `{text}`, stadium `([text])`, subroutine `[[text]]`, and more. In 0.2 every
+  node is drawn as a box; distinct shape glyphs are planned for 0.3.
+- **Edge labels** `-->|text|` are rendered along the connector.
+- **Edge styles** `-->` (solid), `-.->` (dotted), and `==>` (thick) are parsed.
+  Distinct visual styling for dotted/thick edges is planned for 0.3.
+- **Directions** `LR`, `RL`, `TD`/`TB`, `BT` are parsed. The current layout is
+  grid-based and left-to-right; direction-aware layout is planned for 0.3, and
+  the layout works best on simple/linear graphs.
 
 ### Sequence Diagrams
 
@@ -152,27 +134,20 @@ graph TD
 sequenceDiagram
     Alice->>Bob: Hello Bob
     Bob-->>Alice: Hi Alice
-    Alice->>Bob: How are you?
-    Bob-->>Alice: Great!
 ````
 
 ```
- ┌──────────┐      ┌──────────┐
- │  Alice   │      │   Bob    │
- └──────────┘      └──────────┘
-      ┆ Hello Bob       ┆
-      ──────────────────►
-      ┆ Hi Alice        ┆
-      ◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-      ┆ How are you?    ┆
-      ──────────────────►
-      ┆ Great!          ┆
-      ◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+   Alice              Bob
+
+      │                 │
+
+      ├─────────────────▶ Hello Bob
+      ◀┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ Hi Alice
 ```
 
-**Message types:** solid arrow `->>`, dashed arrow `-->>`
-
-**Participants:** `participant`, `actor`, aliases
+- **Message types:** solid arrow `->>`, dashed arrow `-->>` (rendered dashed).
+- **Participants:** declared with `participant` / `actor`, or inferred from
+  messages.
 
 ### Class Diagrams
 
@@ -180,39 +155,36 @@ sequenceDiagram
 classDiagram
     class Animal {
         +String name
-        +int age
         +makeSound()
     }
     class Dog {
-        +String breed
         +fetch()
     }
     Animal <|-- Dog
 ````
 
 ```
-  ┌──────────────┐
-  │    Animal    │
-  ├──────────────┤
-  │ +String name │
-  │ +int age     │
-  ├──────────────┤
-  │ +makeSound() │
-  └──────────────┘
-          △
-          │
-  ┌───────────────┐
-  │      Dog      │
-  ├───────────────┤
-  │ +String breed │
-  ├───────────────┤
-  │ +fetch()      │
-  └───────────────┘
+┌────────────────┐
+│     Animal     │
+├────────────────┤
+│+String name    │
+├────────────────┤
+│+makeSound()    │
+└────────────────┘
+
+┌────────────────┐
+│      Dog       │
+├────────────────┤
+│+fetch()        │
+└────────────────┘
+
+Animal <|-- Dog
 ```
 
-**Relationships:** inheritance `<|--`, composition `*--`, aggregation `o--`, association `--`
-
-**Members:** attributes and methods with visibility (`+` public, `-` private, `#` protected)
+- **Members:** fields and methods with visibility (`+` public, `-` private,
+  `#` protected, `~` package). A divider separates fields from methods.
+- **Relationships:** `<|--`, `*--`, `o--`, `--|>`, `..>`, `..|>`, and plain `--`
+  are parsed and shown as a text legend below the boxes.
 
 ### State Diagrams
 
@@ -225,44 +197,15 @@ stateDiagram-v2
 ````
 
 ```
-╭───────◯──────╮
-│              │
-│      ●       │
-│              │
-╰───────◯──────╯
-        │
-        ▼
-╭──────────────╮
-│              │
-│     Idle     │
-│              │
-╰───────┬──────╯
-        │
-   start│
-        ▼
-╭──────────────╮
-│              │
-│  Processing  │
-│              │
-╰───────┬──────╯
-        │
-complete│
-        ▼
-╭──────────────╮
-│              │
-│     Done     │
-│              │
-╰───────┬──────╯
-        │
-        ▼
-╭───────◯──────╮
-│              │
-│      ◉       │
-│              │
-╰───────◯──────╯
+● ──▶ Idle
+Idle ──▶ Processing : start
+Processing ──▶ Done : complete
+Done ──▶ ◉
 ```
 
-**Features:** `[*]` start/end states, transition labels, composite states
+- `[*]` renders as a start (`●`) or end (`◉`) marker.
+- Transition labels (`: text`) are shown.
+- Composite/nested states are not yet supported.
 
 ### Pie Charts
 
@@ -274,9 +217,9 @@ pie title Pets adopted by volunteers
 ````
 
 ```
-  Dogs┃████████████████████████████████  79.4%
-  Cats┃▓▓▓▓▓▓▓  17.5%
-  Rats┃░   3.1%
+Dogs┃████████████████████████████████ 79.4%
+Cats┃███████ 17.5%
+Rats┃█ 3.1%
 ```
 
 ### ER Diagrams
@@ -286,91 +229,91 @@ erDiagram
     CUSTOMER {
         int id PK
         string name
-        string email
     }
     ORDER {
         int id PK
         int customer_id FK
-        date order_date
     }
     CUSTOMER ||--o{ ORDER : places
 ````
 
 ```
-  ┌────────────────────┐
-  │      CUSTOMER      │
-  ├────────────────────┤
-  │PK    : id          │
-  │      : name        │
-  │      : email       │
-  └────────────────────┘
-  
-  ┌────────────────────┐
-  │       ORDER        │
-  ├────────────────────┤
-  │PK    : id          │
-  │   FK : customer_id │
-  │      : order_date  │
-  └────────────────────┘
-  
-  CUSTOMER ||--o{ ORDER
+┌────────────────────┐
+│      CUSTOMER      │
+├────────────────────┤
+│PK    : id          │
+│      : name        │
+└────────────────────┘
+
+┌────────────────────┐
+│       ORDER        │
+├────────────────────┤
+│PK    : id          │
+│   FK : customer_id │
+└────────────────────┘
+
+CUSTOMER ||--o{ ORDER
 ```
 
-**Cardinality notation:**
-- `||` exactly one
-- `}|` one or more  
-- `o|` zero or one
-- `o{` zero or more
-
-**Attribute markers:**
-- `PK` primary key
-- `FK` foreign key
+**Cardinality notation:** `||` exactly one, `}|`/`|{` one or more,
+`o|`/`|o` zero or one, `o{`/`}o` zero or more. **Attribute markers:** `PK`
+primary key, `FK` foreign key. Relationships are shown as a text legend below
+the entity boxes.
 
 ## CLI Options
 
 | Flag | Description |
 |------|-------------|
-| `--ascii` | ASCII-only output (no Unicode box-drawing) |
-| `--theme NAME` | Color theme. Options: default, terra, neon, mono, amber, phosphor |
-| `--padding-x N` | Horizontal padding inside boxes (default: 4) |
-| `--padding-y N` | Vertical padding inside boxes (default: 2) |
-| `--width N` | Max output width (default: 120) |
-| `--sharp-edges` | Sharp corners on edge turns instead of rounded |
-| `--format FORMAT` | Output format: text or json (AI-friendly) |
+| `--ascii`, `-a` | ASCII-only output (no Unicode box-drawing) |
+| `--theme <NAME>` | Theme palette: `default`, `terra`, `neon`, `mono`, `amber`, `phosphor`. Color output is planned for 0.3; current output is monochrome. |
+| `--format <FORMAT>` | Output format: `text` (default) or `json` |
+| `--padding-x <N>` / `--padding-y <N>` | Reserved box-padding options (accepted but not yet applied) |
 
 ## Themes
 
-6 built-in themes:
+Six theme palettes can be selected with `--theme`:
 
-| Theme | Colors | Description |
-|-------|--------|-------------|
-| `default` | Cyan nodes, yellow arrows | Default terminal colors |
-| `terra` | Warm earth tones (browns, oranges) | Retro/vintage feel |
-| `neon` | Magenta nodes, green arrows | Cyberpunk style |
-| `mono` | White/gray monochrome | Simple and clean |
-| `amber` | Amber/gold CRT-style | Classic amber monitor |
-| `phosphor` | Green phosphor terminal-style | Classic green terminal |
+| Theme | Intended look |
+|-------|---------------|
+| `default` | Default terminal colors |
+| `terra` | Warm earth tones |
+| `neon` | Cyberpunk magenta/green |
+| `mono` | White/gray monochrome |
+| `amber` | Classic amber monitor |
+| `phosphor` | Classic green terminal |
+
+> Colored ANSI output is not wired up yet — `--theme` currently selects a
+> palette but the rendered diagram is monochrome. Color rendering is the first
+> item on the 0.3 roadmap.
 
 ## Roadmap
 
-- [x] ER diagrams ✅
-- [ ] Block diagrams
-- [ ] Git graphs
-- [ ] Treemaps
-- [ ] Mindmaps
+Shipped in 0.2:
+
+- [x] ER diagrams
+- [x] Correct node-shape/label parsing for flowcharts
+- [x] Honest, machine-parseable errors for invalid input
+
+Planned for 0.3 and beyond:
+
+- [ ] ANSI **color** output for the theme palettes
+- [ ] Node-shape **glyphs** (diamond, stadium, rounded, …)
+- [ ] Direction-aware layout (`TD`/`BT`/`RL`) and better edge routing
+- [ ] Distinct rendering for dotted/thick edge styles
+- [ ] Composite states; sequence notes & activations
 - [ ] More themes (gruvbox, monokai, dracula, nord, solarized)
 - [ ] Auto-fit to terminal width
 - [ ] Interactive TUI viewer
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build,
+test, and PR guidelines. In short:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork the repository and create a feature branch.
+2. Make your change and add a test for it.
+3. Run `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`.
+4. Open a Pull Request.
 
 ## Acknowledgements
 
