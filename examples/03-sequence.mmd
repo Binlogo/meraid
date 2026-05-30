@@ -1,0 +1,7 @@
+sequenceDiagram
+    participant Client
+    participant Server
+    Client->>Server: GET /status
+    Server-->>Client: 200 OK
+    Client->>Server: POST /jobs
+    Server-->>Client: 202 Accepted

@@ -2,11 +2,12 @@
 //! AI-friendly: designed for AI coding agents to use
 
 use clap::{Parser, ValueEnum, ValueHint};
-use meraid::{Theme, ThemeType};
+use meraid::{Diagram, DiagramType, Theme, ThemeType};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, IsTerminal, Read};
 use std::path::PathBuf;
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Parser)]
 #[command(name = "meraid")]
@@ -139,8 +140,11 @@ fn run() -> anyhow::Result<()> {
         let output = renderer.render(&diagram, &layout);
         (diagram, layout, output)
     }) {
-        Ok((diagram, layout, output)) => {
+        Ok((diagram, _layout, output)) => {
             if json_mode {
+                let (width, height) = output_dimensions(&output);
+                let nodes = node_count(&diagram);
+                let edges = edge_count(&diagram);
                 let json_output = JsonOutput {
                     success: true,
                     diagram: Some(output),
@@ -148,10 +152,10 @@ fn run() -> anyhow::Result<()> {
                     metadata: JsonMetadata {
                         diagram_type: format!("{:?}", diagram.diagram_type).to_lowercase(),
                         theme: cli.theme.as_str().to_string(),
-                        width: layout.width,
-                        height: layout.height,
-                        nodes: diagram.nodes.len(),
-                        edges: diagram.edges.len(),
+                        width,
+                        height,
+                        nodes,
+                        edges,
                     },
                 };
                 println!("{}", serde_json::to_string_pretty(&json_output)?);
@@ -236,6 +240,39 @@ fn read_input(path: &Option<PathBuf>, json_mode: bool, theme: &str) -> anyhow::R
             io::stdin().read_to_string(&mut buf)?;
             Ok(buf)
         }
+    }
+}
+
+/// Measure the rendered output's visible dimensions (display columns × rows),
+/// ignoring trailing blank lines and trailing whitespace.
+fn output_dimensions(output: &str) -> (usize, usize) {
+    let lines: Vec<&str> = output.lines().map(|l| l.trim_end()).collect();
+    let height = lines
+        .iter()
+        .rposition(|l| !l.is_empty())
+        .map_or(0, |i| i + 1);
+    let width = lines[..height]
+        .iter()
+        .map(|l| UnicodeWidthStr::width(*l))
+        .max()
+        .unwrap_or(0);
+    (width, height)
+}
+
+/// Count the "nodes" of a diagram in the sense most meaningful for its type.
+fn node_count(d: &Diagram) -> usize {
+    match d.diagram_type {
+        DiagramType::ER => d.entities.len(),
+        DiagramType::Sequence => d.participants.len(),
+        _ => d.nodes.len(),
+    }
+}
+
+/// Count the "edges" (connections/relationships) of a diagram.
+fn edge_count(d: &Diagram) -> usize {
+    match d.diagram_type {
+        DiagramType::Class | DiagramType::ER => d.edges.len() + d.relationships.len(),
+        _ => d.edges.len(),
     }
 }
 
