@@ -113,20 +113,43 @@ graph LR
 
 ```
 ┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Start   │ ──▶│ Process  │ ──▶│   Done   │
+│  Start   │───▶│ Process  │───▶│   Done   │
 │          │    │          │    │          │
 └──────────┘    └──────────┘    └──────────┘
+```
+
+Branching graphs lay out as a diamond: a decision node's outcomes straddle the
+trunk (one above, one below), each labelled on its own branch, with forks and
+merges drawn as real `┤` / `┴` junctions.
+
+````mermaid
+graph LR
+    A[Start] --> B{OK?}
+    B -->|yes| C[Save]
+    B -->|no| D[Stop]
+````
+
+```
+                                      ┌──────────┐
+                                 ┌yes▶│   Save   │
+                                 │    │          │
+┌──────────┐       ┌──────────┐  │    └──────────┘
+│  Start   │──────▶│   OK?    │──┤
+│          │       │          │  │    ┌──────────┐
+└──────────┘       └──────────┘  └no─▶│   Stop   │
+                                      │          │
+                                      └──────────┘
 ```
 
 - **Node shapes** are parsed — rectangle `[text]`, rounded `(text)`, diamond
   `{text}`, stadium `([text])`, subroutine `[[text]]`, and more. In 0.2 every
   node is drawn as a box; distinct shape glyphs are planned for 0.3.
-- **Edge labels** `-->|text|` are rendered along the connector.
+- **Edge labels** `-->|text|` are rendered on the branch.
 - **Edge styles** `-->` (solid), `-.->` (dotted), and `==>` (thick) are parsed.
   Distinct visual styling for dotted/thick edges is planned for 0.3.
-- **Directions** `LR`, `RL`, `TD`/`TB`, `BT` are parsed. The current layout is
-  grid-based and left-to-right; direction-aware layout is planned for 0.3, and
-  the layout works best on simple/linear graphs.
+- **Directions** `LR`, `RL`, `TD`/`TB`, `BT` are parsed. The layout is currently
+  left-to-right regardless of the declared direction; direction-aware layout is
+  planned for 0.3.
 
 ### Sequence Diagrams
 
@@ -292,13 +315,14 @@ Shipped in 0.2:
 
 - [x] ER diagrams
 - [x] Correct node-shape/label parsing for flowcharts
+- [x] Branch-aware flowchart layout (diamonds, labelled branches, junctions)
 - [x] Honest, machine-parseable errors for invalid input
 
 Planned for 0.3 and beyond:
 
 - [ ] ANSI **color** output for the theme palettes
 - [ ] Node-shape **glyphs** (diamond, stadium, rounded, …)
-- [ ] Direction-aware layout (`TD`/`BT`/`RL`) and better edge routing
+- [ ] Direction-aware layout (`TD`/`BT`/`RL`)
 - [ ] Distinct rendering for dotted/thick edge styles
 - [ ] Composite states; sequence notes & activations
 - [ ] More themes (gruvbox, monokai, dracula, nord, solarized)

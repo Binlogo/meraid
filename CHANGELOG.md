@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Flowchart layout**: nodes reachable by paths of different lengths (a merge
+  node such as a shared end state) are now placed in their longest-path layer
+  instead of an earlier one, so boxes no longer overprint each other into
+  corrupted output. Layering uses a longest-path computation rather than
+  first-visit distance.
+
+### Changed
+
+- **Flowchart layout**: branching graphs now render as a diamond — a decision
+  node's outcomes straddle the trunk (one above, one below) via barycentric
+  vertical placement, the trunk stays on a single straight line, and edge labels
+  sit on their own branch instead of being clipped. Edges route through the
+  column gaps with proper corner and `┤`/`┴`/`┼` junction glyphs, and trailing
+  blank rows/whitespace are trimmed from the output.
+
 ## [0.2.0] - 2026-05-30
 
 This release focuses on correctness: several diagram types produced wrong output

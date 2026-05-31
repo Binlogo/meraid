@@ -58,21 +58,21 @@ graph TD
 ```
 
 ```
-┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Start   │ ──▶│   OK?    │ ye▶│   Save   │
-│          │    │          ││   │          │
-└──────────┘    └──────────┘│   └──────────┘
-                            │
-                            │   ┌──────────┐
-                             no▶│   Stop   │
-                                │          │
-                                └──────────┘
+                                      ┌──────────┐
+                                 ┌yes▶│   Save   │
+                                 │    │          │
+┌──────────┐       ┌──────────┐  │    └──────────┘
+│  Start   │──────▶│   OK?    │──┤
+│          │       │          │  │    ┌──────────┐
+└──────────┘       └──────────┘  └no─▶│   Stop   │
+                                      │          │
+                                      └──────────┘
 ```
 
-Branches and edge labels (`|yes|`, `|no|`) parse and route correctly. Note that
-edge-label placement on branching layouts is still rough — long labels get
-clipped (`yes` → `ye▶`). This is honestly a 0.3 layout item. For clean output
-today, prefer linear chains or keep branch labels short.
+A decision node's branches straddle the trunk — one routed above, one below —
+and the edge labels (`yes`/`no`) sit on their own branch. The fork is drawn with
+a real `┤` junction. Layout is still left-to-right regardless of the declared
+direction (`TD`/`TB` honoring is a 0.3 item).
 
 ## 3. Sequence diagram (`03-sequence.mmd`)
 
@@ -296,7 +296,7 @@ meraid diagram.mmd || echo "failed to render"
 | Diagram type | Parses | Renders today | Polished output |
 | --- | :---: | --- | :---: |
 | Flowchart (linear) | ✅ | boxes + arrows | ✅ |
-| Flowchart (branching) | ✅ | boxes + arrows, rough label placement | ⚠️ 0.3 |
+| Flowchart (branching) | ✅ | diamond layout, branches straddle the trunk, labels on branches, `┤`/`┴` junctions | ✅ |
 | Sequence | ✅ | lifelines, solid/dashed arrows | ✅ |
 | Class | ✅ | boxes + field/method compartments, relationship list | partial |
 | State | ✅ | transition list with start/end markers | partial → boxed in 0.3 |
@@ -304,8 +304,9 @@ meraid diagram.mmd || echo "failed to render"
 | ER | ✅ | entity boxes with PK/FK, relationship list | partial |
 
 **Deferred to 0.3** (tracked, not yet implemented): per-shape glyphs in
-flowcharts, branch-aware edge-label placement, drawn relationship arrows for
-class/ER, and boxed state-machine layout.
+flowcharts, direction-aware layout (`TD`/`TB`/`RL`/`BT` are laid out
+left-to-right today), drawn relationship arrows for class/ER, and boxed
+state-machine layout.
 
 **Not supported** (clean error + non-zero exit): `gitGraph`, `block`,
 `treemap`, and other diagram types not listed above. meraid tells you exactly
