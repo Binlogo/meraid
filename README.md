@@ -3,7 +3,7 @@
 <p align="center">Render Mermaid diagrams in your terminal or Rust application.</p>
 
 <p align="center">
-  <img src="docs/demo/meraid-demo.svg" alt="meraid demo" width="800">
+  <img src="docs/demo/meraid-demo.png" alt="meraid demo" width="800">
 </p>
 
 <p align="center">
