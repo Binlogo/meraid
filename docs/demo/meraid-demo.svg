@@ -1,17 +1,17 @@
-<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+<svg width="1200" height="768" viewBox="0 0 1200 768" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">meraid demo</title>
-  <desc id="desc">A README demo for the meraid Rust CLI showing the actual terminal output it produces: a flowchart, a sequence diagram, and JSON output mode.</desc>
+  <desc id="desc">A README demo for the meraid Rust CLI showing the actual terminal output it produces: a branching flowchart with labelled branches, a sequence diagram, and JSON output mode.</desc>
 
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1100" y2="700" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="0" y1="0" x2="1100" y2="760" gradientUnits="userSpaceOnUse">
       <stop stop-color="#F7F1E6"/>
       <stop offset="1" stop-color="#EDE1CC"/>
     </linearGradient>
-    <linearGradient id="window" x1="80" y1="190" x2="1120" y2="640" gradientUnits="userSpaceOnUse">
+    <linearGradient id="window" x1="80" y1="190" x2="1120" y2="710" gradientUnits="userSpaceOnUse">
       <stop stop-color="#1B1712"/>
       <stop offset="1" stop-color="#221D17"/>
     </linearGradient>
-    <filter id="shadow" x="40" y="160" width="1120" height="540" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <filter id="shadow" x="40" y="160" width="1120" height="600" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="bg"/>
       <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
       <feOffset dy="16"/>
@@ -26,16 +26,16 @@
     </pattern>
   </defs>
 
-  <rect width="1200" height="720" fill="url(#bg)"/>
-  <rect width="1200" height="720" fill="url(#paperGrid)"/>
+  <rect width="1200" height="768" fill="url(#bg)"/>
+  <rect width="1200" height="768" fill="url(#paperGrid)"/>
 
   <text x="82" y="92" fill="#2B2217" font-family="Georgia, 'Times New Roman', serif" font-size="46" font-weight="700" letter-spacing="-1">Render Mermaid where you work.</text>
   <text x="84" y="132" fill="#5E4A35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="21">Terminal-native diagrams for CLI workflows, CI logs, SSH sessions, and AI agents.</text>
 
   <!-- terminal window -->
   <g filter="url(#shadow)">
-    <rect x="80" y="190" width="1040" height="450" rx="24" fill="url(#window)"/>
-    <rect x="80.75" y="190.75" width="1038.5" height="448.5" rx="23.25" stroke="#5E4C35" stroke-opacity="0.45" stroke-width="1.5"/>
+    <rect x="80" y="190" width="1040" height="520" rx="24" fill="url(#window)"/>
+    <rect x="80.75" y="190.75" width="1038.5" height="518.5" rx="23.25" stroke="#5E4C35" stroke-opacity="0.45" stroke-width="1.5"/>
   </g>
   <rect x="80" y="190" width="1040" height="50" rx="24" fill="#241D16"/>
   <rect x="80" y="222" width="1040" height="18" fill="#241D16"/>
@@ -48,33 +48,38 @@
 
   <!-- terminal body: real meraid output, monospace -->
   <g font-family="'SF Mono','DejaVu Sans Mono',Menlo,Consolas,'Liberation Mono',monospace" font-size="18" xml:space="preserve">
-    <text x="108" y="286" fill="#8FBE83">$ echo &quot;graph LR; A[Spec] --&gt; B[Build] --&gt; C[Ship]&quot; | meraid</text>
-    <text x="108" y="311" fill="#E9DCC2">┌──────────┐    ┌──────────┐    ┌──────────┐</text>
-    <text x="108" y="334" fill="#E9DCC2">│   Spec   │ ──▶│  Build   │ ──▶│   Ship   │</text>
-    <text x="108" y="357" fill="#E9DCC2">│          │    │          │    │          │</text>
-    <text x="108" y="380" fill="#E9DCC2">└──────────┘    └──────────┘    └──────────┘</text>
+    <text x="108" y="282" fill="#8FBE83">$ cat ci.mmd | meraid</text>
+    <text x="108" y="305" fill="#E9DCC2">                                        ┌──────────┐</text>
+    <text x="108" y="328" fill="#E9DCC2">                                  ┌pass▶│  Deploy  │</text>
+    <text x="108" y="351" fill="#E9DCC2">                                  │     │          │</text>
+    <text x="108" y="374" fill="#E9DCC2">┌──────────┐        ┌──────────┐  │     └──────────┘</text>
+    <text x="108" y="397" fill="#E9DCC2">│  Commit  │───────▶│  Tests?  │──┤</text>
+    <text x="108" y="420" fill="#E9DCC2">│          │        │          │  │     ┌──────────┐</text>
+    <text x="108" y="443" fill="#E9DCC2">└──────────┘        └──────────┘  └fail▶│  Notify  │</text>
+    <text x="108" y="466" fill="#E9DCC2">                                        │          │</text>
+    <text x="108" y="489" fill="#E9DCC2">                                        └──────────┘</text>
 
-    <text x="108" y="430" fill="#8FBE83">$ cat deploy.mmd | meraid</text>
-    <text x="108" y="455" fill="#E9DCC2">    Web               API</text>
-    <text x="108" y="478" fill="#E9DCC2">      │                 │</text>
-    <text x="108" y="501" fill="#E9DCC2">      ├─────────────────▶ POST /deploy</text>
-    <text x="108" y="524" fill="#E9DCC2">      ◀┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ 202 Accepted</text>
+    <text x="108" y="525" fill="#8FBE83">$ cat deploy.mmd | meraid</text>
+    <text x="108" y="548" fill="#E9DCC2">    Web               API</text>
+    <text x="108" y="571" fill="#E9DCC2">      │                 │</text>
+    <text x="108" y="594" fill="#E9DCC2">      ├─────────────────▶ POST /deploy</text>
+    <text x="108" y="617" fill="#E9DCC2">      ◀┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ 202 Accepted</text>
 
-    <text x="108" y="574" fill="#8FBE83">$ meraid release.mmd --format json</text>
-    <text x="108" y="599" fill="#C7B79B">{&quot;success&quot;:true,&quot;metadata&quot;:{&quot;diagram_type&quot;:&quot;flowchart&quot;,&quot;nodes&quot;:3,&quot;edges&quot;:2}}</text>
+    <text x="108" y="653" fill="#8FBE83">$ meraid ci.mmd --format json</text>
+    <text x="108" y="676" fill="#C7B79B">{&quot;success&quot;:true,&quot;metadata&quot;:{&quot;diagram_type&quot;:&quot;flowchart&quot;,&quot;nodes&quot;:4,&quot;edges&quot;:3}}</text>
   </g>
 
   <!-- footer chips -->
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="600">
-    <rect x="80" y="668" width="108" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
-    <text x="98" y="689" fill="#5E4A35">pure Rust</text>
-    <rect x="198" y="668" width="132" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
-    <text x="216" y="689" fill="#5E4A35">stdin-friendly</text>
-    <rect x="340" y="668" width="150" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
-    <text x="358" y="689" fill="#5E4A35">JSON for agents</text>
-    <rect x="500" y="668" width="142" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
-    <text x="518" y="689" fill="#5E4A35">ASCII fallback</text>
-    <rect x="652" y="668" width="286" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
-    <text x="670" y="689" fill="#5E4A35">6 theme palettes · color in 0.3</text>
+    <rect x="80" y="724" width="108" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
+    <text x="98" y="745" fill="#5E4A35">pure Rust</text>
+    <rect x="198" y="724" width="132" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
+    <text x="216" y="745" fill="#5E4A35">stdin-friendly</text>
+    <rect x="340" y="724" width="150" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
+    <text x="358" y="745" fill="#5E4A35">JSON for agents</text>
+    <rect x="500" y="724" width="142" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
+    <text x="518" y="745" fill="#5E4A35">ASCII fallback</text>
+    <rect x="652" y="724" width="286" height="32" rx="16" fill="#EAD9BC" stroke="#C9B188"/>
+    <text x="670" y="745" fill="#5E4A35">6 theme palettes · color in 0.3</text>
   </g>
 </svg>
