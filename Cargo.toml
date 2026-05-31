@@ -14,7 +14,7 @@ keywords = ["mermaid", "diagram", "terminal", "cli", "ascii"]
 categories = ["command-line-utilities", "visualization"]
 # Ship only what is needed to build and use the crate — keep AI-skill dirs,
 # docs, and examples out of the published tarball.
-include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+include = ["/src/**/*.rs", "/Cargo.toml", "/README.md", "/LICENSE"]
 
 [[bin]]
 name = "meraid"

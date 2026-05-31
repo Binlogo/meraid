@@ -7,24 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **Flowchart layout**: nodes reachable by paths of different lengths (a merge
-  node such as a shared end state) are now placed in their longest-path layer
-  instead of an earlier one, so boxes no longer overprint each other into
-  corrupted output. Layering uses a longest-path computation rather than
-  first-visit distance.
-
-### Changed
-
-- **Flowchart layout**: branching graphs now render as a diamond — a decision
-  node's outcomes straddle the trunk (one above, one below) via barycentric
-  vertical placement, the trunk stays on a single straight line, and edge labels
-  sit on their own branch instead of being clipped. Edges route through the
-  column gaps with proper corner and `┤`/`┴`/`┼` junction glyphs, and trailing
-  blank rows/whitespace are trimmed from the output.
-
-## [0.2.0] - 2026-05-30
+## [0.2.0] - 2026-05-31
 
 This release focuses on correctness: several diagram types produced wrong output
 (not just plain output), and the documentation described features that did not
@@ -37,6 +20,9 @@ crates.io / open-source packaging conventions.
   and edge labels (`-->|text|`) are now parsed instead of being treated as part
   of the node id — boxes no longer read `A[Start]` or `|Yes| C(Pr`. Per-edge
   styles are tracked, and `;` is accepted as a statement separator.
+- **Flowchart layout**: a merge node reachable by paths of different lengths is
+  now placed in its longest-path column instead of colliding with an earlier
+  node, so boxes no longer overprint each other into corrupted output.
 - **Sequence**: a dashed message such as `Bob-->>Alice` no longer creates a
   phantom `Bob-` participant (arrow tokens are matched longest-first); dashed
   messages now render with a dashed line.
@@ -58,6 +44,11 @@ crates.io / open-source packaging conventions.
 
 ### Changed
 
+- **Flowchart layout**: branching graphs render as a diamond — branches straddle
+  the trunk (one above, one below) via barycentric vertical placement, the trunk
+  stays on one straight line, edge labels sit on their own branch instead of
+  being clipped, and edges route through the column gaps with real corner and
+  `┤`/`┴`/`┼` junction glyphs (trailing blank rows/whitespace are trimmed).
 - README rewritten so every example matches the actual binary output, and the
   dependency, CLI-flag, theme, and install claims are accurate.
 - `Cargo.toml`: added `keywords`, `categories`, `readme`, `documentation`,
