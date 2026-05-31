@@ -256,6 +256,62 @@ class 用户服务 {
     }
 
     #[test]
+    fn test_flowchart_merge_node_does_not_overlap() {
+        // Regression: a merge node reachable by two paths of different lengths
+        // must land in its longest-path layer, not collide with an earlier node.
+        // Previously `结束` (reachable directly and via the long branch) was
+        // placed in the same column/coordinate as another node, overprinting it.
+        let source = "graph LR\n\
+            A --> B --> C --> D\n\
+            A --> E\n\
+            B --> E\n\
+            E --> D";
+        let diagram = parse_mermaid(source).unwrap();
+        let layout = Layout::new(&diagram).layout();
+
+        // No two nodes may share the same top-left coordinate.
+        let positions: Vec<_> = diagram
+            .nodes
+            .iter()
+            .map(|n| {
+                let p = layout.positions.get(&n.id).expect("node positioned");
+                (p.x, p.y)
+            })
+            .collect();
+        for i in 0..positions.len() {
+            for j in (i + 1)..positions.len() {
+                assert_ne!(
+                    positions[i], positions[j],
+                    "nodes {} and {} overlap at {:?}",
+                    diagram.nodes[i].id, diagram.nodes[j].id, positions[i]
+                );
+            }
+        }
+
+        // D is the sink (longest path A→B→C→D), so it must be the rightmost box.
+        let max_x = layout.positions.values().map(|p| p.x).max().unwrap();
+        assert_eq!(layout.positions.get("D").unwrap().x, max_x);
+    }
+
+    #[test]
+    fn test_flowchart_branches_straddle_trunk() {
+        // A decision node's two outcomes should sit on opposite sides of the
+        // trunk (one above, one below), not stacked together.
+        let source = "graph LR\nA --> B\nB --> C\nB --> D";
+        let diagram = parse_mermaid(source).unwrap();
+        let layout = Layout::new(&diagram).layout();
+
+        let b = layout.positions.get("B").unwrap().y;
+        let c = layout.positions.get("C").unwrap().y;
+        let d = layout.positions.get("D").unwrap().y;
+        // One branch above B, the other below.
+        assert!(
+            (c < b && d > b) || (d < b && c > b),
+            "branches did not straddle the trunk: B={b}, C={c}, D={d}"
+        );
+    }
+
+    #[test]
     fn test_sequence_diagram_with_chinese_and_mixed_text_alignment() {
         let source = r#"
 sequenceDiagram

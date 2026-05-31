@@ -95,11 +95,23 @@ impl Renderer {
             }
         }
 
-        // Convert to string
-        for row in &canvas {
-            for cell in row {
-                output.push_str(cell);
-            }
+        // Convert to string, trimming trailing whitespace on each line and any
+        // blank rows the canvas padding left at the bottom.
+        let mut lines: Vec<String> = canvas
+            .iter()
+            .map(|row| {
+                let mut line = String::new();
+                for cell in row {
+                    line.push_str(cell);
+                }
+                line.trim_end().to_string()
+            })
+            .collect();
+        while lines.last().is_some_and(|l| l.is_empty()) {
+            lines.pop();
+        }
+        for line in &lines {
+            output.push_str(line);
             output.push('\n');
         }
 
@@ -554,108 +566,107 @@ impl Renderer {
         to: &Position,
         label: Option<&str>,
     ) {
-        // Manhattan-style edge routing (horizontal then vertical, or vice versa)
-        let from_x = from.x + from.width;
+        // Edges exit the right edge of the source box at its vertical center and
+        // enter the left edge of the destination box at its center. Forward
+        // edges (the only kind the layout produces) are drawn as an elbow: a
+        // short horizontal stub, a vertical jog placed in the gap between the
+        // columns, then a horizontal run into the arrow. Routing the vertical in
+        // the gap keeps it off any box's border column, and turning onto the
+        // destination's own row keeps the long run clear of boxes in other rows.
+        let ascii = self.ascii_only;
+        let arrow_r = if ascii { ">" } else { "▶" };
+        let arrow_l = if ascii { "<" } else { "◀" };
+
+        let from_x = from.x + from.width; // first gap column right of the source box
         let from_y = from.y + from.height / 2;
-        let to_x = to.x;
+        let to_x = to.x; // destination box's left-border column
         let to_y = to.y + to.height / 2;
 
-        // Determine routing direction based on relative positions
-        let dy = to_y.abs_diff(from_y);
-        let dx = to_x.abs_diff(from_x);
-        let (mid_x, mid_y, vertical_first) = if dy > dx {
-            // Vertical distance is greater, route vertically first
-            (from_x, to_y, true)
-        } else {
-            // Route horizontally first (default)
-            (to_x, from_y, false)
+        let width = canvas[0].len();
+        // Draw an arrow head / terminal glyph, overwriting whatever is there.
+        let put = |canvas: &mut [Vec<String>], y: usize, x: usize, s: &str| {
+            if y < canvas.len() && x < width {
+                canvas[y][x] = s.to_string();
+            }
+        };
+        // Add a line segment, merging with any line already in the cell so
+        // crossings and forks become the correct junction glyph. Leaves text,
+        // arrows, and box borders untouched.
+        let line = |canvas: &mut [Vec<String>], y: usize, x: usize, add: u8| {
+            if y >= canvas.len() || x >= width {
+                return;
+            }
+            match glyph_mask(canvas[y][x].as_str()) {
+                Some(base) => canvas[y][x] = mask_glyph(base | add, ascii).to_string(),
+                None if canvas[y][x] == " " => canvas[y][x] = mask_glyph(add, ascii).to_string(),
+                None => {}
+            }
         };
 
-        if vertical_first {
-            // Vertical segment first, then horizontal
-            // From -> mid point (vertical)
-            let vert_start = from_y.min(mid_y);
-            let vert_end = from_y.max(mid_y);
-            for y in (vert_start + 1)..vert_end {
-                if y < canvas.len() && from_x < canvas[0].len() {
-                    canvas[y][from_x] = if self.ascii_only { "|" } else { "│" }.to_string();
-                }
-            }
+        let label_y;
+        let label_x;
 
-            // Horizontal segment
-            let horiz_start = from_x.min(to_x);
-            let horiz_end = from_x.max(to_x);
-            for x in (horiz_start + 1)..horiz_end {
-                if mid_y < canvas.len() && x < canvas[0].len() {
-                    canvas[mid_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
-                }
+        if to_x <= from_x {
+            // Non-forward (back / self) edge: best-effort straight line.
+            let (a, b) = (to_x.min(from_x), to_x.max(from_x));
+            for x in a..b {
+                line(canvas, from_y, x, DIR_E | DIR_W);
             }
-
-            // Vertical segment to target (mid_y -> to_y)
-            let vert_start = mid_y.min(to_y);
-            let vert_end = mid_y.max(to_y);
-            for y in (vert_start + 1)..vert_end {
-                if y < canvas.len() && to_x < canvas[0].len() {
-                    canvas[y][to_x] = if self.ascii_only { "|" } else { "│" }.to_string();
-                }
+            if to_x < from_x {
+                put(canvas, to_y, to_x + 1, arrow_l);
             }
+            label_y = from_y;
+            label_x = a + 1;
+        } else if to_y == from_y {
+            // Same row: straight horizontal line into the arrow.
+            for x in from_x..to_x.saturating_sub(1) {
+                line(canvas, from_y, x, DIR_E | DIR_W);
+            }
+            put(canvas, to_y, to_x.saturating_sub(1), arrow_r);
+            label_y = from_y;
+            label_x = from_x + 1;
         } else {
-            // Horizontal first, then vertical
-            // From -> mid point (horizontal)
-            let horiz_start = from_x.min(mid_x);
-            let horiz_end = from_x.max(mid_x);
-            for x in (horiz_start + 1)..horiz_end {
-                if from_y < canvas.len() && x < canvas[0].len() {
-                    canvas[from_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
-                }
-            }
-
-            // Vertical segment
-            let vert_start = from_y.min(to_y);
-            let vert_end = from_y.max(to_y);
-            for y in (vert_start + 1)..vert_end {
-                if y < canvas.len() && mid_x < canvas[0].len() {
-                    canvas[y][mid_x] = if self.ascii_only { "|" } else { "│" }.to_string();
-                }
-            }
-
-            // Horizontal segment to target (mid_x -> to_x)
-            let horiz_start = mid_x.min(to_x);
-            let horiz_end = mid_x.max(to_x);
-            for x in (horiz_start + 1)..horiz_end {
-                if to_y < canvas.len() && x < canvas[0].len() {
-                    canvas[to_y][x] = if self.ascii_only { "-" } else { "─" }.to_string();
-                }
-            }
-        }
-
-        // Draw arrow head at destination
-        if to_x > from_x {
-            // Arrow pointing right
-            if to_y < canvas.len() && to_x > 0 && to_x < canvas[0].len() {
-                canvas[to_y][to_x - 1] = if self.ascii_only { ">" } else { "▶" }.to_string();
-            }
-        } else if to_x < from_x {
-            // Arrow pointing left
-            if to_y < canvas.len() && to_x + 1 < canvas[0].len() {
-                canvas[to_y][to_x + 1] = if self.ascii_only { "<" } else { "◀" }.to_string();
-            }
-        }
-
-        // Draw edge label if present. Write only onto empty cells or the edge's
-        // own line glyphs so the label never garbles a node box or its text.
-        if let Some(label_text) = label.filter(|l| !l.is_empty()) {
-            let label_y = if vertical_first {
-                mid_y
+            // Elbow: stub right, vertical jog through the gap, then into the box.
+            let turn_x = (from_x + 2).min(to_x.saturating_sub(1));
+            let going_down = to_y > from_y;
+            let (vert, vs, ve) = if going_down {
+                (DIR_S, from_y, to_y)
             } else {
-                (from_y + to_y) / 2
+                (DIR_N, to_y, from_y)
             };
-            let label_x = from_x.min(to_x) + 1;
+
+            for x in from_x..turn_x {
+                line(canvas, from_y, x, DIR_E | DIR_W);
+            }
+            // Corner where the westbound stub turns vertical (also a fork point
+            // when a sibling branch leaves the same column — hence merge).
+            line(canvas, from_y, turn_x, DIR_W | vert);
+            // Vertical run between the two rows.
+            for y in (vs + 1)..ve {
+                line(canvas, y, turn_x, DIR_N | DIR_S);
+            }
+            // Corner where the vertical turns east toward the destination.
+            let arrive = if going_down { DIR_N } else { DIR_S };
+            line(canvas, to_y, turn_x, arrive | DIR_E);
+            // Horizontal run on the destination's row into the arrow.
+            for x in (turn_x + 1)..to_x.saturating_sub(1) {
+                line(canvas, to_y, x, DIR_E | DIR_W);
+            }
+            put(canvas, to_y, to_x.saturating_sub(1), arrow_r);
+            label_y = to_y;
+            label_x = turn_x + 1;
+        }
+
+        // Edge label: write only onto blank cells or the edge's own line glyphs
+        // so it never garbles a node box, an arrow, or a corner; stop before the
+        // arrow head.
+        if let Some(label_text) = label.filter(|l| !l.is_empty()) {
             if label_y < canvas.len() {
+                let limit = to_x.max(from_x).saturating_sub(1);
                 let mut current_x = label_x;
                 for ch in label_text.chars() {
                     let cell_width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
-                    if current_x >= canvas[0].len() {
+                    if current_x + cell_width > limit || current_x >= width {
                         break;
                     }
                     let overwritable = matches!(
@@ -665,7 +676,7 @@ impl Renderer {
                     if overwritable {
                         canvas[label_y][current_x] = ch.to_string();
                         for offset in 1..cell_width {
-                            if current_x + offset < canvas[0].len() {
+                            if current_x + offset < width {
                                 canvas[label_y][current_x + offset].clear();
                             }
                         }
@@ -773,5 +784,60 @@ impl BoxChars {
 impl Node {
     fn get_label(&self) -> &str {
         &self.label
+    }
+}
+
+// Connection-direction bit flags for a box-drawing line cell.
+const DIR_N: u8 = 1;
+const DIR_E: u8 = 2;
+const DIR_S: u8 = 4;
+const DIR_W: u8 = 8;
+
+/// Map a box-drawing glyph back to its set of connected directions, or `None`
+/// if the cell is not an edge-line glyph (blank, text, arrow head, …). Used to
+/// merge overlapping edge segments into the correct junction.
+fn glyph_mask(s: &str) -> Option<u8> {
+    Some(match s {
+        "─" | "-" => DIR_E | DIR_W,
+        "│" | "|" => DIR_N | DIR_S,
+        "┌" => DIR_S | DIR_E,
+        "┐" => DIR_S | DIR_W,
+        "└" => DIR_N | DIR_E,
+        "┘" => DIR_N | DIR_W,
+        "├" => DIR_N | DIR_S | DIR_E,
+        "┤" => DIR_N | DIR_S | DIR_W,
+        "┬" => DIR_E | DIR_S | DIR_W,
+        "┴" => DIR_E | DIR_N | DIR_W,
+        "┼" | "+" => DIR_N | DIR_E | DIR_S | DIR_W,
+        _ => return None,
+    })
+}
+
+/// Pick the box-drawing glyph for a set of connected directions.
+fn mask_glyph(mask: u8, ascii: bool) -> &'static str {
+    if ascii {
+        return match mask {
+            0 => " ",
+            m if m == DIR_E | DIR_W => "-",
+            m if m == DIR_N | DIR_S => "|",
+            _ => "+",
+        };
+    }
+    match mask {
+        m if m == DIR_E | DIR_W => "─",
+        m if m == DIR_N | DIR_S => "│",
+        m if m == DIR_S | DIR_E => "┌",
+        m if m == DIR_S | DIR_W => "┐",
+        m if m == DIR_N | DIR_E => "└",
+        m if m == DIR_N | DIR_W => "┘",
+        m if m == DIR_N | DIR_S | DIR_E => "├",
+        m if m == DIR_N | DIR_S | DIR_W => "┤",
+        m if m == DIR_E | DIR_S | DIR_W => "┬",
+        m if m == DIR_E | DIR_N | DIR_W => "┴",
+        m if m == DIR_N | DIR_E | DIR_S | DIR_W => "┼",
+        // Single-direction stubs render as the matching straight piece.
+        m if m == DIR_E || m == DIR_W => "─",
+        m if m == DIR_N || m == DIR_S => "│",
+        _ => " ",
     }
 }
