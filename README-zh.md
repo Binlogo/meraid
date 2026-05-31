@@ -3,7 +3,7 @@
 <p align="center">在终端或 Rust 应用中渲染 Mermaid 图表</p>
 
 <p align="center">
-  <img src="docs/demo/meraid-demo.svg" alt="meraid 演示" width="800">
+  <img src="docs/demo/meraid-demo.png" alt="meraid 演示" width="800">
 </p>
 
 <p align="center">
