@@ -33,9 +33,9 @@
 - **ASCII fallback** — `--ascii` works on any terminal, even the most basic ones.
 - **Pipe-friendly CLI** — `cat diagram.mmd | meraid` just works.
 - **CJK-aware** — Chinese/Japanese/Korean text keeps box borders aligned.
-
-> Theme palettes are selectable today (`--theme`), but colored ANSI output is on
-> the [roadmap](#roadmap) for 0.3 — current output is monochrome.
+- **Color themes** — pick a palette with `--theme`; meraid emits ANSI color
+  (truecolor or 256-color) when writing to a terminal, and stays plain when
+  piped or redirected.
 
 ## Why meraid?
 
@@ -79,8 +79,11 @@ meraid diagram.mmd
 # Render from stdin
 echo "graph LR; A-->B-->C" | meraid
 
-# Select a theme palette
+# Select a theme palette (color is emitted on a terminal)
 meraid diagram.mmd --theme neon
+
+# Force color through a pipe, e.g. into a pager
+meraid diagram.mmd --theme neon --color always | less -R
 
 # ASCII-only output
 meraid diagram.mmd --ascii
@@ -288,7 +291,8 @@ the entity boxes.
 | Flag | Description |
 |------|-------------|
 | `--ascii`, `-a` | ASCII-only output (no Unicode box-drawing) |
-| `--theme <NAME>` | Theme palette: `default`, `terra`, `neon`, `mono`, `amber`, `phosphor`. Color output is planned for 0.3; current output is monochrome. |
+| `--theme <NAME>` | Theme palette: `default`, `terra`, `neon`, `mono`, `amber`, `phosphor`. `default` inherits your terminal's colors; the others recolor by role. |
+| `--color <WHEN>` | When to emit ANSI color: `auto` (default — only on a terminal), `always`, or `never`. Honors `NO_COLOR`; `--color always` overrides it. JSON output is always uncolored. |
 | `--format <FORMAT>` | Output format: `text` (default) or `json` |
 | `--padding-x <N>` / `--padding-y <N>` | Reserved box-padding options (accepted but not yet applied) |
 
@@ -305,9 +309,12 @@ Six theme palettes can be selected with `--theme`:
 | `amber` | Classic amber monitor |
 | `phosphor` | Classic green terminal |
 
-> Colored ANSI output is not wired up yet — `--theme` currently selects a
-> palette but the rendered diagram is monochrome. Color rendering is the first
-> item on the 0.3 roadmap.
+Color is **foreground-only** and emitted by role (node text, edges, edge
+labels, start/end markers). meraid emits **truecolor** when your terminal
+advertises it (`COLORTERM=truecolor`/`24bit`) and falls back to **256-color**
+otherwise. The `default` theme inherits your terminal's own colors, so it looks
+the same whether or not color is enabled — pick another palette to recolor.
+Background fills are reserved for a future release.
 
 ## Roadmap
 
@@ -320,7 +327,8 @@ Shipped in 0.2:
 
 Planned for 0.3 and beyond:
 
-- [ ] ANSI **color** output for the theme palettes
+- [x] ANSI **color** output for the theme palettes (truecolor / 256-color,
+  TTY-aware, `--color` flag, `NO_COLOR` honored)
 - [ ] Node-shape **glyphs** (diamond, stadium, rounded, …)
 - [ ] Direction-aware layout (`TD`/`BT`/`RL`)
 - [ ] Distinct rendering for dotted/thick edge styles

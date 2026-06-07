@@ -2,8 +2,19 @@
 
 use serde::{Deserialize, Serialize};
 
+/// How much color a render should emit. Resolved by the CLI from `--color`,
+/// stdout TTY detection, `NO_COLOR`, and `COLORTERM`, then handed to the
+/// renderer. `None` produces byte-for-byte monochrome output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorMode {
+    #[default]
+    None,
+    Ansi256,
+    TrueColor,
+}
+
 /// Color codes for terminals
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -25,7 +36,10 @@ impl Color {
             if gray > 248 {
                 return 231;
             }
-            return ((gray - 8) / 247) * 24 + 232;
+            // Map gray 8..=248 onto the 24-step grayscale ramp (indices
+            // 232..=255). Multiply before dividing so the step isn't truncated
+            // to zero.
+            return 232 + ((gray as u16 - 8) * 24 / 247) as u8;
         }
 
         let r = (self.r as f32 / 255.0 * 5.0) as u8;
@@ -39,17 +53,32 @@ impl Color {
     pub fn to_escape(&self) -> String {
         format!("\x1b[38;5;{}m", self.to_ansi256())
     }
+
+    /// Foreground SGR escape for the given color mode. Returns an empty string
+    /// for `ColorMode::None` so callers can prepend it unconditionally.
+    pub fn fg(&self, mode: ColorMode) -> String {
+        match mode {
+            ColorMode::None => String::new(),
+            ColorMode::Ansi256 => format!("\x1b[38;5;{}m", self.to_ansi256()),
+            ColorMode::TrueColor => format!("\x1b[38;2;{};{};{}m", self.r, self.g, self.b),
+        }
+    }
 }
 
-/// Theme for diagram rendering
+/// Theme for diagram rendering.
+///
+/// Each role is `Option<Color>`: `Some(c)` paints that role with `c`, `None`
+/// inherits the terminal's own color. The `default` theme leaves every role
+/// `None`, so selecting it is a no-op even when color is enabled.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
     pub name: String,
-    pub node_bg: Color,
-    pub node_fg: Color,
-    pub edge: Color,
-    pub edge_label: Color,
-    pub start_end: Color,
+    /// Reserved: box-interior fill. Not painted yet (foreground-only).
+    pub node_bg: Option<Color>,
+    pub node_fg: Option<Color>,
+    pub edge: Option<Color>,
+    pub edge_label: Option<Color>,
+    pub start_end: Option<Color>,
 }
 
 impl Theme {
@@ -96,68 +125,107 @@ impl std::str::FromStr for ThemeType {
 
 // Theme definitions
 fn default_theme() -> Theme {
+    // Every role inherits the terminal's own colors — selecting `default` is a
+    // no-op even when color is enabled.
     Theme {
         name: "default".to_string(),
-        node_bg: Color::new(0, 0, 0),
-        node_fg: Color::new(255, 255, 255),
-        edge: Color::new(255, 255, 0),
-        edge_label: Color::new(255, 255, 0),
-        start_end: Color::new(128, 128, 128),
+        node_bg: None,
+        node_fg: None,
+        edge: None,
+        edge_label: None,
+        start_end: None,
     }
 }
 
 fn terra_theme() -> Theme {
     Theme {
         name: "terra".to_string(),
-        node_bg: Color::new(45, 35, 25),
-        node_fg: Color::new(255, 220, 180),
-        edge: Color::new(255, 180, 100),
-        edge_label: Color::new(255, 180, 100),
-        start_end: Color::new(100, 80, 60),
+        node_bg: Some(Color::new(45, 35, 25)),
+        node_fg: Some(Color::new(255, 220, 180)),
+        edge: Some(Color::new(255, 180, 100)),
+        edge_label: Some(Color::new(255, 180, 100)),
+        start_end: Some(Color::new(100, 80, 60)),
     }
 }
 
 fn neon_theme() -> Theme {
     Theme {
         name: "neon".to_string(),
-        node_bg: Color::new(20, 0, 30),
-        node_fg: Color::new(255, 0, 255),
-        edge: Color::new(0, 255, 127),
-        edge_label: Color::new(0, 255, 255),
-        start_end: Color::new(128, 0, 128),
+        node_bg: Some(Color::new(20, 0, 30)),
+        node_fg: Some(Color::new(255, 0, 255)),
+        edge: Some(Color::new(0, 255, 127)),
+        edge_label: Some(Color::new(0, 255, 255)),
+        start_end: Some(Color::new(128, 0, 128)),
     }
 }
 
 fn mono_theme() -> Theme {
     Theme {
         name: "mono".to_string(),
-        node_bg: Color::new(0, 0, 0),
-        node_fg: Color::new(255, 255, 255),
-        edge: Color::new(192, 192, 192),
-        edge_label: Color::new(192, 192, 192),
-        start_end: Color::new(128, 128, 128),
+        node_bg: Some(Color::new(0, 0, 0)),
+        node_fg: Some(Color::new(255, 255, 255)),
+        edge: Some(Color::new(192, 192, 192)),
+        edge_label: Some(Color::new(192, 192, 192)),
+        start_end: Some(Color::new(128, 128, 128)),
     }
 }
 
 fn amber_theme() -> Theme {
     Theme {
         name: "amber".to_string(),
-        node_bg: Color::new(30, 20, 0),
-        node_fg: Color::new(255, 192, 0),
-        edge: Color::new(255, 128, 0),
-        edge_label: Color::new(255, 192, 0),
-        start_end: Color::new(128, 96, 0),
+        node_bg: Some(Color::new(30, 20, 0)),
+        node_fg: Some(Color::new(255, 192, 0)),
+        edge: Some(Color::new(255, 128, 0)),
+        edge_label: Some(Color::new(255, 192, 0)),
+        start_end: Some(Color::new(128, 96, 0)),
     }
 }
 
 fn phosphor_theme() -> Theme {
     Theme {
         name: "phosphor".to_string(),
-        node_bg: Color::new(0, 10, 0),
-        node_fg: Color::new(0, 255, 0),
-        edge: Color::new(0, 200, 0),
-        edge_label: Color::new(0, 255, 0),
-        start_end: Color::new(0, 128, 0),
+        node_bg: Some(Color::new(0, 10, 0)),
+        node_fg: Some(Color::new(0, 255, 0)),
+        edge: Some(Color::new(0, 200, 0)),
+        edge_label: Some(Color::new(0, 255, 0)),
+        start_end: Some(Color::new(0, 128, 0)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fg_escape_depends_on_color_mode() {
+        let c = Color::new(255, 0, 255);
+        // None emits nothing — output stays byte-for-byte monochrome.
+        assert_eq!(c.fg(ColorMode::None), "");
+        // TrueColor emits the exact RGB triple.
+        assert_eq!(c.fg(ColorMode::TrueColor), "\x1b[38;2;255;0;255m");
+        // Ansi256 emits the quantized index.
+        assert_eq!(
+            c.fg(ColorMode::Ansi256),
+            format!("\x1b[38;5;{}m", c.to_ansi256())
+        );
+    }
+
+    #[test]
+    fn to_ansi256_does_not_collapse_grays_to_near_black() {
+        // Regression: the grayscale branch used integer division by 247, which
+        // truncated to 0 for every gray <= 248, mapping them all to index 232
+        // (near-black). A light gray must land high in the 232..=255 ramp and
+        // be brighter than a dark gray.
+        let dark = Color::new(40, 40, 40).to_ansi256();
+        let light = Color::new(192, 192, 192).to_ansi256();
+        assert!(
+            light > dark,
+            "light gray ({light}) should map brighter than dark gray ({dark})"
+        );
+        assert!(
+            light > 240,
+            "192-gray should sit high in the grayscale ramp, got {light}"
+        );
     }
 }
 

@@ -12,7 +12,7 @@ pub use diagram::{Diagram, DiagramType, Edge, EdgeStyle, Node, NodeShape};
 pub use layout::Layout;
 pub use parser::parse_mermaid;
 pub use render::Renderer;
-pub use theme::{Theme, ThemeType};
+pub use theme::{ColorMode, Theme, ThemeType};
 
 use anyhow::Result;
 
@@ -443,5 +443,198 @@ D --> E
         // might create multiple entries. Just check we have nodes and edges.
         assert!(diagram.nodes.len() >= 5);
         assert!(diagram.edges.len() >= 5);
+    }
+
+    // ==================== Color Tests ====================
+
+    use crate::ColorMode;
+
+    fn render_with(src: &str, theme: ThemeType, mode: ColorMode) -> String {
+        let diagram = parse_mermaid(src).unwrap();
+        let layout = Layout::new(&diagram).layout();
+        Renderer::new(Theme::get(theme))
+            .color_mode(mode)
+            .render(&diagram, &layout)
+    }
+
+    const STATE_SRC: &str = "stateDiagram-v2\n[*] --> Idle\nIdle --> Done: go\n";
+
+    #[test]
+    fn state_diagram_colors_roles_with_truecolor() {
+        let out = render_with(STATE_SRC, ThemeType::Neon, ColorMode::TrueColor);
+        // neon: edge (0,255,127), node_fg (255,0,255), start_end (128,0,128)
+        assert!(
+            out.contains("\x1b[38;2;0;255;127m"),
+            "arrow should use the edge color"
+        );
+        assert!(
+            out.contains("\x1b[38;2;255;0;255m"),
+            "a state name should use node_fg"
+        );
+        assert!(
+            out.contains("\x1b[38;2;128;0;128m"),
+            "the start/end marker should use start_end"
+        );
+        assert!(out.contains("\x1b[0m"), "colored spans must be reset");
+    }
+
+    #[test]
+    fn default_theme_emits_no_color_even_in_truecolor() {
+        let mono = render_with(STATE_SRC, ThemeType::Default, ColorMode::None);
+        let colored = render_with(STATE_SRC, ThemeType::Default, ColorMode::TrueColor);
+        assert_eq!(
+            mono, colored,
+            "the default theme inherits terminal colors — it must emit no escapes"
+        );
+        assert!(!colored.contains('\x1b'));
+    }
+
+    #[test]
+    fn pie_chart_colors_label_bar_and_percent() {
+        let src = "pie title Pets\n\"Dogs\" : 386\n\"Cats\" : 85\n";
+        let out = render_with(src, ThemeType::Neon, ColorMode::TrueColor);
+        assert!(
+            out.contains("\x1b[38;2;255;0;255m"),
+            "label should use node_fg"
+        );
+        assert!(out.contains("\x1b[38;2;0;255;127m"), "bars should use edge");
+        assert!(
+            out.contains("\x1b[38;2;0;255;255m"),
+            "percentages should use edge_label"
+        );
+    }
+
+    const FLOW_SRC: &str = "graph LR\nA[Start] --> B{OK?}\nB -->|yes| C[Save]\nB -->|no| D[Stop]\n";
+
+    #[test]
+    fn flowchart_colors_boxes_edges_and_labels() {
+        let out = render_with(FLOW_SRC, ThemeType::Neon, ColorMode::TrueColor);
+        assert!(
+            out.contains("\x1b[38;2;255;0;255m"),
+            "node boxes should use node_fg"
+        );
+        assert!(
+            out.contains("\x1b[38;2;0;255;127m"),
+            "edge wires/arrows should use edge"
+        );
+        assert!(
+            out.contains("\x1b[38;2;0;255;255m"),
+            "edge labels should use edge_label"
+        );
+        assert!(out.contains("\x1b[0m"), "colored runs must be reset");
+    }
+
+    #[test]
+    fn flowchart_color_none_matches_legacy_and_truecolor_strips_to_same_glyphs() {
+        let plain = {
+            let diagram = parse_mermaid(FLOW_SRC).unwrap();
+            let layout = Layout::new(&diagram).layout();
+            Renderer::new(Theme::get(ThemeType::Neon)).render(&diagram, &layout)
+        };
+        let none = render_with(FLOW_SRC, ThemeType::Neon, ColorMode::None);
+        assert_eq!(plain, none, "ColorMode::None must match legacy output");
+
+        // Stripping all escapes from the colored output must reproduce the
+        // monochrome glyph layer exactly — proving color never shifts columns.
+        let colored = render_with(FLOW_SRC, ThemeType::Neon, ColorMode::TrueColor);
+        let stripped = strip_ansi(&colored);
+        assert_eq!(stripped, plain, "colored glyph layer must equal monochrome");
+    }
+
+    fn strip_ansi(s: &str) -> String {
+        let mut out = String::new();
+        let mut chars = s.chars();
+        while let Some(c) = chars.next() {
+            if c == '\x1b' {
+                // Skip CSI sequence up to and including the final 'm'.
+                for e in chars.by_ref() {
+                    if e == 'm' {
+                        break;
+                    }
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn class_diagram_colors_box_and_legend() {
+        let src = "classDiagram\nclass Animal {\n+String name\n+makeSound()\n}\nAnimal <|-- Dog\n";
+        let out = render_with(src, ThemeType::Neon, ColorMode::TrueColor);
+        assert!(
+            out.contains("\x1b[38;2;255;0;255m"),
+            "class box should use node_fg"
+        );
+        assert!(
+            out.contains("\x1b[38;2;0;255;127m"),
+            "relationship legend should use edge"
+        );
+    }
+
+    #[test]
+    fn er_diagram_colors_box_and_legend() {
+        let src = "erDiagram\nCUSTOMER {\nint id PK\n}\nORDER {\nint id PK\n}\nCUSTOMER ||--o{ ORDER : places\n";
+        let out = render_with(src, ThemeType::Neon, ColorMode::TrueColor);
+        assert!(
+            out.contains("\x1b[38;2;255;0;255m"),
+            "entity box should use node_fg"
+        );
+        assert!(
+            out.contains("\x1b[38;2;0;255;127m"),
+            "relationship legend should use edge"
+        );
+    }
+
+    #[test]
+    fn sequence_diagram_colors_participants_and_messages() {
+        let src = "sequenceDiagram\nAlice->>Bob: Hello\nBob-->>Alice: Hi\n";
+        let out = render_with(src, ThemeType::Neon, ColorMode::TrueColor);
+        assert!(
+            out.contains("\x1b[38;2;255;0;255m"),
+            "participant names should use node_fg"
+        );
+        assert!(
+            out.contains("\x1b[38;2;0;255;127m"),
+            "lifelines and message lines should use edge"
+        );
+        assert!(
+            out.contains("\x1b[38;2;0;255;255m"),
+            "message labels should use edge_label"
+        );
+    }
+
+    #[test]
+    fn color_mode_none_never_emits_escapes_for_any_type() {
+        let samples = [
+            "graph LR\nA[Start] --> B{OK?}\nB -->|yes| C[Save]\n",
+            "sequenceDiagram\nAlice->>Bob: Hello\nBob-->>Alice: Hi\n",
+            "classDiagram\nclass Animal {\n+String name\n+makeSound()\n}\nAnimal <|-- Dog\n",
+            "stateDiagram-v2\n[*] --> Idle\nIdle --> Done: go\n",
+            "pie title Pets\n\"Dogs\" : 386\n\"Cats\" : 85\n",
+            "erDiagram\nCUSTOMER {\nint id PK\n}\nORDER {\nint id PK\n}\nCUSTOMER ||--o{ ORDER : places\n",
+        ];
+        for src in samples {
+            let out = render_with(src, ThemeType::Neon, ColorMode::None);
+            assert!(
+                !out.contains('\x1b'),
+                "ColorMode::None must emit no escapes, but did for: {src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn color_mode_none_matches_legacy_monochrome() {
+        // The opt-in contract: with ColorMode::None even a vivid theme emits
+        // byte-for-byte the same output as before color existed.
+        let plain = {
+            let diagram = parse_mermaid(STATE_SRC).unwrap();
+            let layout = Layout::new(&diagram).layout();
+            Renderer::new(Theme::get(ThemeType::Neon)).render(&diagram, &layout)
+        };
+        let none = render_with(STATE_SRC, ThemeType::Neon, ColorMode::None);
+        assert_eq!(plain, none);
+        assert!(!none.contains('\x1b'));
     }
 }

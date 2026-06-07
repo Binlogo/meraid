@@ -4,7 +4,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::diagram::{Diagram, DiagramType, Entity, Node};
 use crate::layout::{LayoutResult, Position};
-use crate::theme::Theme;
+use crate::theme::{ansi, Color, ColorMode, Theme};
 
 /// Calculate the display width of a string in a terminal using Unicode width.
 /// This properly handles CJK characters (2 cells) and ASCII (1 cell).
@@ -19,6 +19,7 @@ pub struct Renderer {
     ascii_only: bool,
     padding_x: usize,
     padding_y: usize,
+    color_mode: ColorMode,
 }
 
 impl Renderer {
@@ -28,6 +29,7 @@ impl Renderer {
             ascii_only: false,
             padding_x: 4,
             padding_y: 1,
+            color_mode: ColorMode::None,
         }
     }
 
@@ -40,6 +42,25 @@ impl Renderer {
         self.padding_x = x;
         self.padding_y = y;
         self
+    }
+
+    /// Enable colored output at the given depth. `ColorMode::None` (the default)
+    /// keeps output byte-for-byte monochrome.
+    pub fn color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = mode;
+        self
+    }
+
+    /// Wrap `text` in the foreground escape for `role` and a reset. Returns the
+    /// text unchanged when color is off, the role inherits the terminal color
+    /// (`None`), or the text is empty — so callers can paint unconditionally.
+    fn paint(&self, role: Option<Color>, text: &str) -> String {
+        match role {
+            Some(color) if self.color_mode != ColorMode::None && !text.is_empty() => {
+                format!("{}{}{}", color.fg(self.color_mode), text, ansi::RESET)
+            }
+            _ => text.to_string(),
+        }
     }
 
     /// Box-drawing glyph set for the current mode (ASCII or Unicode).
@@ -65,18 +86,18 @@ impl Renderer {
     }
 
     fn render_flowchart(&self, diagram: &Diagram, layout: &LayoutResult) -> String {
-        let mut output = String::new();
-
-        // Create canvas. Each column is a terminal cell, so use strings instead of chars
-        // to support wide characters like Chinese without stretching the box.
+        // Each column is a terminal cell, so cells are strings (not chars) to
+        // support wide characters like Chinese without stretching the box.
         let canvas_width = layout.width.max(80);
-        let canvas_height = layout.height.max(20);
-        let mut canvas: Vec<Vec<String>> = vec![vec![" ".to_string(); canvas_width]];
-
-        // Ensure we have enough rows
-        for _ in canvas.len()..canvas_height {
-            canvas.push(vec![" ".to_string(); layout.width.max(80)]);
+        let mut canvas_height = layout.height.max(20);
+        // Pre-size to the tallest node so draw_node never resizes mid-draw —
+        // a resize would otherwise have to keep the color grid in step.
+        for node in &diagram.nodes {
+            if let Some(pos) = layout.positions.get(&node.id) {
+                canvas_height = canvas_height.max(pos.y + pos.height + 2);
+            }
         }
+        let mut canvas = Canvas::new(canvas_width, canvas_height);
 
         // Draw nodes
         for node in &diagram.nodes {
@@ -95,27 +116,54 @@ impl Renderer {
             }
         }
 
-        // Convert to string, trimming trailing whitespace on each line and any
+        // Flatten to a string, trimming trailing whitespace on each line and any
         // blank rows the canvas padding left at the bottom.
-        let mut lines: Vec<String> = canvas
-            .iter()
-            .map(|row| {
-                let mut line = String::new();
-                for cell in row {
-                    line.push_str(cell);
-                }
-                line.trim_end().to_string()
-            })
+        let mut lines: Vec<String> = (0..canvas.height())
+            .map(|y| self.flatten_row(&canvas.cells[y], &canvas.colors[y]))
             .collect();
         while lines.last().is_some_and(|l| l.is_empty()) {
             lines.pop();
         }
+        let mut output = String::new();
         for line in &lines {
             output.push_str(line);
             output.push('\n');
         }
 
         output
+    }
+
+    /// Flatten one canvas row to a string. Trailing blank cells are dropped
+    /// (matching the old `trim_end`). When color is on, runs of same-color cells
+    /// are coalesced into a single escape and every colored run is reset before
+    /// the line ends, so color never bleeds across the newline. With
+    /// `ColorMode::None` this emits the bare glyphs — byte-for-byte the legacy
+    /// output.
+    fn flatten_row(&self, cells: &[String], colors: &[Option<Color>]) -> String {
+        // Trim boundary: index of the last cell whose glyph is not blank. A cell
+        // is blank when it is a space or the cleared half of a wide character.
+        let Some(last) = cells.iter().rposition(|c| !c.trim().is_empty()) else {
+            return String::new();
+        };
+
+        let mut out = String::new();
+        let mut active: Option<Color> = None;
+        for x in 0..=last {
+            if self.color_mode != ColorMode::None && colors[x] != active {
+                if active.is_some() {
+                    out.push_str(ansi::RESET);
+                }
+                if let Some(color) = colors[x] {
+                    out.push_str(&color.fg(self.color_mode));
+                }
+                active = colors[x];
+            }
+            out.push_str(&cells[x]);
+        }
+        if active.is_some() {
+            out.push_str(ansi::RESET);
+        }
+        out
     }
 
     fn render_sequence(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
@@ -146,7 +194,10 @@ impl Renderer {
         let self_msg = if self.ascii_only { "@" } else { "↺" };
 
         for (i, participant) in diagram.participants.iter().enumerate() {
-            output.push_str(&self.pad_string(participant, participant_width));
+            output.push_str(&self.paint(
+                self.theme.node_fg,
+                &self.pad_string(participant, participant_width),
+            ));
             if i < diagram.participants.len() - 1 {
                 output.push_str(&" ".repeat(gap_width));
             }
@@ -155,7 +206,7 @@ impl Renderer {
 
         for (i, _) in diagram.participants.iter().enumerate() {
             output.push_str(&" ".repeat(participant_width / 2));
-            output.push_str(vbar);
+            output.push_str(&self.paint(self.theme.edge, vbar));
             output.push_str(&" ".repeat(participant_width - participant_width / 2 - 1));
             if i < diagram.participants.len() - 1 {
                 output.push_str(&" ".repeat(gap_width));
@@ -209,11 +260,14 @@ impl Renderer {
                 overwrite_at(&mut line, to_center, head_left);
             }
 
-            output.push_str(line.trim_end());
+            // The connector (line + junctions + arrowhead) is all the edge role;
+            // painted after the monochrome line is built so overwrite_at's
+            // char indexing stays correct.
+            output.push_str(&self.paint(self.theme.edge, line.trim_end()));
             if let Some(label) = &edge.label {
                 if !label.is_empty() {
                     output.push(' ');
-                    output.push_str(label);
+                    output.push_str(&self.paint(self.theme.edge_label, label));
                 }
             }
             output.push('\n');
@@ -245,6 +299,9 @@ impl Renderer {
             format!("{}{}{}", prefix, member.name, suffix)
         };
 
+        // The whole box (borders + name + members + dividers) is one role.
+        let nf = self.theme.node_fg;
+
         for node in &diagram.nodes {
             // Box width based on content (display width for CJK support).
             let mut max_width = str_width(node.get_label());
@@ -254,24 +311,31 @@ impl Renderer {
             let box_width = max_width.clamp(16, 40);
 
             let horizontal: String = chars.horizontal.to_string().repeat(box_width);
+            let divider = format!("{}{}{}", div_l, horizontal, div_r);
 
             // Top border.
-            output.push(chars.top_left);
-            output.push_str(&horizontal);
-            output.push(chars.top_right);
-            output.push('\n');
-
+            push_line(
+                &mut output,
+                self.paint(
+                    nf,
+                    &format!("{}{}{}", chars.top_left, horizontal, chars.top_right),
+                ),
+            );
             // Class name (centered).
-            output.push(chars.vertical);
-            output.push_str(&self.pad_string(node.get_label(), box_width));
-            output.push(chars.vertical);
-            output.push('\n');
-
+            push_line(
+                &mut output,
+                self.paint(
+                    nf,
+                    &format!(
+                        "{}{}{}",
+                        chars.vertical,
+                        self.pad_string(node.get_label(), box_width),
+                        chars.vertical
+                    ),
+                ),
+            );
             // Divider between name and members.
-            output.push(div_l);
-            output.push_str(&horizontal);
-            output.push(div_r);
-            output.push('\n');
+            push_line(&mut output, self.paint(nf, &divider));
 
             let fields: Vec<_> = node
                 .members
@@ -285,43 +349,73 @@ impl Renderer {
                 .collect();
 
             if node.members.is_empty() {
-                output.push(chars.vertical);
-                output.push_str(&" ".repeat(box_width));
-                output.push(chars.vertical);
-                output.push('\n');
+                push_line(
+                    &mut output,
+                    self.paint(
+                        nf,
+                        &format!(
+                            "{}{}{}",
+                            chars.vertical,
+                            " ".repeat(box_width),
+                            chars.vertical
+                        ),
+                    ),
+                );
             } else {
                 for &member in &fields {
-                    output.push(chars.vertical);
-                    output.push_str(&self.pad_string_left(&member_line(member), box_width));
-                    output.push(chars.vertical);
-                    output.push('\n');
+                    push_line(
+                        &mut output,
+                        self.paint(
+                            nf,
+                            &format!(
+                                "{}{}{}",
+                                chars.vertical,
+                                self.pad_string_left(&member_line(member), box_width),
+                                chars.vertical
+                            ),
+                        ),
+                    );
                 }
                 // Second divider between fields and methods.
                 if !fields.is_empty() && !methods.is_empty() {
-                    output.push(div_l);
-                    output.push_str(&horizontal);
-                    output.push(div_r);
-                    output.push('\n');
+                    push_line(&mut output, self.paint(nf, &divider));
                 }
                 for &member in &methods {
-                    output.push(chars.vertical);
-                    output.push_str(&self.pad_string_left(&member_line(member), box_width));
-                    output.push(chars.vertical);
-                    output.push('\n');
+                    push_line(
+                        &mut output,
+                        self.paint(
+                            nf,
+                            &format!(
+                                "{}{}{}",
+                                chars.vertical,
+                                self.pad_string_left(&member_line(member), box_width),
+                                chars.vertical
+                            ),
+                        ),
+                    );
                 }
             }
 
             // Bottom border.
-            output.push(chars.bottom_left);
-            output.push_str(&horizontal);
-            output.push(chars.bottom_right);
-            output.push('\n');
+            push_line(
+                &mut output,
+                self.paint(
+                    nf,
+                    &format!("{}{}{}", chars.bottom_left, horizontal, chars.bottom_right),
+                ),
+            );
             output.push('\n');
         }
 
         // Relationships as a text legend, including both endpoints.
         for rel in &diagram.relationships {
-            output.push_str(&format!("{} {} {}\n", rel.from, rel.rel_type, rel.to));
+            push_line(
+                &mut output,
+                self.paint(
+                    self.theme.edge,
+                    &format!("{} {} {}", rel.from, rel.rel_type, rel.to),
+                ),
+            );
         }
 
         output
@@ -330,32 +424,32 @@ impl Renderer {
     fn render_state(&self, diagram: &Diagram, _layout: &LayoutResult) -> String {
         let mut output = String::new();
 
-        let arrow = if self.ascii_only {
-            " -> "
-        } else {
-            " ──▶ "
-        };
+        let arrow_glyph = if self.ascii_only { "->" } else { "──▶" };
         let start_marker = if self.ascii_only { "(*)" } else { "●" };
         let end_marker = if self.ascii_only { "(o)" } else { "◉" };
 
         for edge in &diagram.edges {
-            let from = if edge.from == "[*]" {
-                start_marker
+            // State names use node_fg; the [*] start/end markers use start_end.
+            let (from_text, from_color) = if edge.from == "[*]" {
+                (start_marker, self.theme.start_end)
             } else {
-                edge.from.as_str()
+                (edge.from.as_str(), self.theme.node_fg)
             };
-            let to = if edge.to == "[*]" {
-                end_marker
+            let (to_text, to_color) = if edge.to == "[*]" {
+                (end_marker, self.theme.start_end)
             } else {
-                edge.to.as_str()
+                (edge.to.as_str(), self.theme.node_fg)
             };
 
-            output.push_str(from);
-            output.push_str(arrow);
-            output.push_str(to);
+            output.push_str(&self.paint(from_color, from_text));
+            output.push(' ');
+            output.push_str(&self.paint(self.theme.edge, arrow_glyph));
+            output.push(' ');
+            output.push_str(&self.paint(to_color, to_text));
 
             if let Some(label) = &edge.label {
-                output.push_str(&format!(" : {}", label));
+                output.push_str(" : ");
+                output.push_str(&self.paint(self.theme.edge_label, label));
             }
             output.push('\n');
         }
@@ -397,10 +491,16 @@ impl Renderer {
 
             // Right-align labels so the separators and bars line up.
             output.push_str(&" ".repeat(label_width.saturating_sub(str_width(label))));
-            output.push_str(label);
-            output.push(separator);
-            output.push_str(&bar_char.to_string().repeat(bar_chars));
-            output.push_str(&format!(" {:.1}%\n", percentage * 100.0));
+            output.push_str(&self.paint(self.theme.node_fg, label));
+            // Separator + bar share the edge role.
+            let bar = format!("{}{}", separator, bar_char.to_string().repeat(bar_chars));
+            output.push_str(&self.paint(self.theme.edge, &bar));
+            output.push(' ');
+            output.push_str(&self.paint(
+                self.theme.edge_label,
+                &format!("{:.1}%", percentage * 100.0),
+            ));
+            output.push('\n');
         }
 
         output
@@ -416,45 +516,68 @@ impl Renderer {
             ('├', '┤')
         };
 
+        // The whole entity box is one role (node_fg).
+        let nf = self.theme.node_fg;
+
         // Render entities
         for entity in &diagram.entities {
             let box_width = self.calculate_er_box_width(entity);
             let horizontal: String = chars.horizontal.to_string().repeat(box_width);
 
             // Top border
-            output.push(chars.top_left);
-            output.push_str(&horizontal);
-            output.push(chars.top_right);
-            output.push('\n');
-
+            push_line(
+                &mut output,
+                self.paint(
+                    nf,
+                    &format!("{}{}{}", chars.top_left, horizontal, chars.top_right),
+                ),
+            );
             // Entity name (centered)
-            output.push(chars.vertical);
-            output.push_str(&self.pad_string(&entity.name, box_width));
-            output.push(chars.vertical);
-            output.push('\n');
-
+            push_line(
+                &mut output,
+                self.paint(
+                    nf,
+                    &format!(
+                        "{}{}{}",
+                        chars.vertical,
+                        self.pad_string(&entity.name, box_width),
+                        chars.vertical
+                    ),
+                ),
+            );
             // Divider
-            output.push(div_l);
-            output.push_str(&horizontal);
-            output.push(div_r);
-            output.push('\n');
+            push_line(
+                &mut output,
+                self.paint(nf, &format!("{}{}{}", div_l, horizontal, div_r)),
+            );
 
             // Attributes
             for attr in &entity.attributes {
                 let pk_marker = if attr.is_primary_key { "PK" } else { "  " };
                 let fk_marker = if attr.is_foreign_key { "FK" } else { "  " };
                 let attr_line = format!("{} {} : {}", pk_marker, fk_marker, attr.name);
-                output.push(chars.vertical);
-                output.push_str(&self.pad_string_left(&attr_line, box_width));
-                output.push(chars.vertical);
-                output.push('\n');
+                push_line(
+                    &mut output,
+                    self.paint(
+                        nf,
+                        &format!(
+                            "{}{}{}",
+                            chars.vertical,
+                            self.pad_string_left(&attr_line, box_width),
+                            chars.vertical
+                        ),
+                    ),
+                );
             }
 
             // Bottom border
-            output.push(chars.bottom_left);
-            output.push_str(&horizontal);
-            output.push(chars.bottom_right);
-            output.push('\n');
+            push_line(
+                &mut output,
+                self.paint(
+                    nf,
+                    &format!("{}{}{}", chars.bottom_left, horizontal, chars.bottom_right),
+                ),
+            );
             output.push('\n');
         }
 
@@ -468,10 +591,13 @@ impl Renderer {
             } else {
                 ("--", "--")
             };
-            output.push_str(&format!(
-                "{} {}--{} {}\n",
-                rel.from, left_card, right_card, rel.to
-            ));
+            push_line(
+                &mut output,
+                self.paint(
+                    self.theme.edge,
+                    &format!("{} {}--{} {}", rel.from, left_card, right_card, rel.to),
+                ),
+            );
         }
 
         output
@@ -491,17 +617,18 @@ impl Renderer {
         max_width.clamp(20, 50)
     }
 
-    fn draw_node(&self, canvas: &mut Vec<Vec<String>>, pos: &Position, label: &str) {
+    fn draw_node(&self, canvas: &mut Canvas, pos: &Position, label: &str) {
         let px = pos.x;
         let py = pos.y;
         let w = pos.width;
         let h = pos.height;
 
-        // Ensure canvas is large enough
-        let required_height = py + h + 2;
-        if canvas.len() < required_height {
-            canvas.resize(required_height, vec![" ".to_string(); canvas[0].len()]);
-        }
+        // The whole box — borders and centered label — is the node_fg role.
+        let nf = self.theme.node_fg;
+        let width = canvas.width;
+
+        // Ensure canvas is large enough (normally a no-op: pre-sized in caller).
+        canvas.resize(py + h + 2);
 
         let chars = if self.ascii_only {
             BoxChars::ascii()
@@ -510,48 +637,49 @@ impl Renderer {
         };
 
         // Top border
-        if px + w < canvas[0].len() {
-            canvas[py][px] = chars.top_left.to_string();
-            for cell in canvas[py].iter_mut().take(px + w - 1).skip(px + 1) {
-                *cell = chars.horizontal.to_string();
+        if px + w < width {
+            canvas.set(py, px, &chars.top_left.to_string(), nf);
+            for x in (px + 1)..(px + w - 1) {
+                canvas.set(py, x, &chars.horizontal.to_string(), nf);
             }
-            canvas[py][px + w - 1] = chars.top_right.to_string();
+            canvas.set(py, px + w - 1, &chars.top_right.to_string(), nf);
         }
 
         // Bottom border
-        if py + h < canvas.len() && px + w < canvas[0].len() {
-            canvas[py + h][px] = chars.bottom_left.to_string();
-            for cell in canvas[py + h].iter_mut().take(px + w - 1).skip(px + 1) {
-                *cell = chars.horizontal.to_string();
+        if py + h < canvas.height() && px + w < width {
+            canvas.set(py + h, px, &chars.bottom_left.to_string(), nf);
+            for x in (px + 1)..(px + w - 1) {
+                canvas.set(py + h, x, &chars.horizontal.to_string(), nf);
             }
-            canvas[py + h][px + w - 1] = chars.bottom_right.to_string();
+            canvas.set(py + h, px + w - 1, &chars.bottom_right.to_string(), nf);
         }
 
-        // Vertical borders and content
+        // Vertical borders
         for y in (py + 1)..(py + h) {
-            if y < canvas.len() && px < canvas[0].len() {
-                canvas[y][px] = chars.vertical.to_string();
+            if y < canvas.height() && px < width {
+                canvas.set(y, px, &chars.vertical.to_string(), nf);
             }
-            if y < canvas.len() && px + w - 1 < canvas[0].len() {
-                canvas[y][px + w - 1] = chars.vertical.to_string();
+            if y < canvas.height() && px + w - 1 < width {
+                canvas.set(y, px + w - 1, &chars.vertical.to_string(), nf);
             }
         }
 
         // Label (centered)
         let label_y = py + h / 2;
-        if label_y < canvas.len() {
+        if label_y < canvas.height() {
             let label_x = px + 1;
             let padded = self.pad_string(label, w - 2);
             let mut current_x = label_x;
             for ch in padded.chars() {
                 let cell_width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
-                if current_x >= canvas[0].len() {
+                if current_x >= width {
                     break;
                 }
-                canvas[label_y][current_x] = ch.to_string();
+                canvas.set(label_y, current_x, &ch.to_string(), nf);
                 for offset in 1..cell_width {
-                    if current_x + offset < canvas[0].len() {
-                        canvas[label_y][current_x + offset].clear();
+                    if current_x + offset < width {
+                        // Cleared half of a wide char — emits nothing.
+                        canvas.set(label_y, current_x + offset, "", nf);
                     }
                 }
                 current_x += cell_width;
@@ -559,13 +687,7 @@ impl Renderer {
         }
     }
 
-    fn draw_edge(
-        &self,
-        canvas: &mut [Vec<String>],
-        from: &Position,
-        to: &Position,
-        label: Option<&str>,
-    ) {
+    fn draw_edge(&self, canvas: &mut Canvas, from: &Position, to: &Position, label: Option<&str>) {
         // Edges exit the right edge of the source box at its vertical center and
         // enter the left edge of the destination box at its center. Forward
         // edges (the only kind the layout produces) are drawn as an elbow: a
@@ -576,29 +698,31 @@ impl Renderer {
         let ascii = self.ascii_only;
         let arrow_r = if ascii { ">" } else { "▶" };
         let arrow_l = if ascii { "<" } else { "◀" };
+        // Wires, junctions, and arrowheads are all the edge role.
+        let edge = self.theme.edge;
 
         let from_x = from.x + from.width; // first gap column right of the source box
         let from_y = from.y + from.height / 2;
         let to_x = to.x; // destination box's left-border column
         let to_y = to.y + to.height / 2;
 
-        let width = canvas[0].len();
+        let width = canvas.width;
         // Draw an arrow head / terminal glyph, overwriting whatever is there.
-        let put = |canvas: &mut [Vec<String>], y: usize, x: usize, s: &str| {
-            if y < canvas.len() && x < width {
-                canvas[y][x] = s.to_string();
-            }
+        let put = |canvas: &mut Canvas, y: usize, x: usize, s: &str, color: Option<Color>| {
+            canvas.set(y, x, s, color);
         };
         // Add a line segment, merging with any line already in the cell so
         // crossings and forks become the correct junction glyph. Leaves text,
         // arrows, and box borders untouched.
-        let line = |canvas: &mut [Vec<String>], y: usize, x: usize, add: u8| {
-            if y >= canvas.len() || x >= width {
+        let line = |canvas: &mut Canvas, y: usize, x: usize, add: u8, color: Option<Color>| {
+            if y >= canvas.height() || x >= width {
                 return;
             }
-            match glyph_mask(canvas[y][x].as_str()) {
-                Some(base) => canvas[y][x] = mask_glyph(base | add, ascii).to_string(),
-                None if canvas[y][x] == " " => canvas[y][x] = mask_glyph(add, ascii).to_string(),
+            let mask = glyph_mask(&canvas.cells[y][x]);
+            let is_blank = canvas.cells[y][x] == " ";
+            match mask {
+                Some(base) => canvas.set(y, x, mask_glyph(base | add, ascii), color),
+                None if is_blank => canvas.set(y, x, mask_glyph(add, ascii), color),
                 None => {}
             }
         };
@@ -610,19 +734,19 @@ impl Renderer {
             // Non-forward (back / self) edge: best-effort straight line.
             let (a, b) = (to_x.min(from_x), to_x.max(from_x));
             for x in a..b {
-                line(canvas, from_y, x, DIR_E | DIR_W);
+                line(canvas, from_y, x, DIR_E | DIR_W, edge);
             }
             if to_x < from_x {
-                put(canvas, to_y, to_x + 1, arrow_l);
+                put(canvas, to_y, to_x + 1, arrow_l, edge);
             }
             label_y = from_y;
             label_x = a + 1;
         } else if to_y == from_y {
             // Same row: straight horizontal line into the arrow.
             for x in from_x..to_x.saturating_sub(1) {
-                line(canvas, from_y, x, DIR_E | DIR_W);
+                line(canvas, from_y, x, DIR_E | DIR_W, edge);
             }
-            put(canvas, to_y, to_x.saturating_sub(1), arrow_r);
+            put(canvas, to_y, to_x.saturating_sub(1), arrow_r, edge);
             label_y = from_y;
             label_x = from_x + 1;
         } else {
@@ -636,32 +760,33 @@ impl Renderer {
             };
 
             for x in from_x..turn_x {
-                line(canvas, from_y, x, DIR_E | DIR_W);
+                line(canvas, from_y, x, DIR_E | DIR_W, edge);
             }
             // Corner where the westbound stub turns vertical (also a fork point
             // when a sibling branch leaves the same column — hence merge).
-            line(canvas, from_y, turn_x, DIR_W | vert);
+            line(canvas, from_y, turn_x, DIR_W | vert, edge);
             // Vertical run between the two rows.
             for y in (vs + 1)..ve {
-                line(canvas, y, turn_x, DIR_N | DIR_S);
+                line(canvas, y, turn_x, DIR_N | DIR_S, edge);
             }
             // Corner where the vertical turns east toward the destination.
             let arrive = if going_down { DIR_N } else { DIR_S };
-            line(canvas, to_y, turn_x, arrive | DIR_E);
+            line(canvas, to_y, turn_x, arrive | DIR_E, edge);
             // Horizontal run on the destination's row into the arrow.
             for x in (turn_x + 1)..to_x.saturating_sub(1) {
-                line(canvas, to_y, x, DIR_E | DIR_W);
+                line(canvas, to_y, x, DIR_E | DIR_W, edge);
             }
-            put(canvas, to_y, to_x.saturating_sub(1), arrow_r);
+            put(canvas, to_y, to_x.saturating_sub(1), arrow_r, edge);
             label_y = to_y;
             label_x = turn_x + 1;
         }
 
         // Edge label: write only onto blank cells or the edge's own line glyphs
         // so it never garbles a node box, an arrow, or a corner; stop before the
-        // arrow head.
+        // arrow head. A label char that lands on a wire flips that cell's role
+        // from edge to edge_label.
         if let Some(label_text) = label.filter(|l| !l.is_empty()) {
-            if label_y < canvas.len() {
+            if label_y < canvas.height() {
                 let limit = to_x.max(from_x).saturating_sub(1);
                 let mut current_x = label_x;
                 for ch in label_text.chars() {
@@ -670,14 +795,15 @@ impl Renderer {
                         break;
                     }
                     let overwritable = matches!(
-                        canvas[label_y][current_x].as_str(),
+                        canvas.cells[label_y][current_x].as_str(),
                         " " | "─" | "│" | "-" | "|"
                     );
                     if overwritable {
-                        canvas[label_y][current_x] = ch.to_string();
+                        canvas.set(label_y, current_x, &ch.to_string(), self.theme.edge_label);
                         for offset in 1..cell_width {
                             if current_x + offset < width {
-                                canvas[label_y][current_x + offset].clear();
+                                // Cleared half of a wide char — emits nothing.
+                                canvas.set(label_y, current_x + offset, "", self.theme.edge_label);
                             }
                         }
                     }
@@ -731,6 +857,12 @@ fn truncate_to_width(s: &str, width: usize) -> String {
     result
 }
 
+/// Append a (possibly already-colored) line followed by a newline.
+fn push_line(out: &mut String, line: String) {
+    out.push_str(&line);
+    out.push('\n');
+}
+
 fn overwrite_at(line: &mut String, start: usize, content: &str) {
     let mut chars: Vec<char> = line.chars().collect();
     for (i, ch) in content.chars().enumerate() {
@@ -745,6 +877,46 @@ fn overwrite_at(line: &mut String, start: usize, content: &str) {
 enum TextAlign {
     Left,
     Center,
+}
+
+/// A flowchart drawing surface: a glyph grid plus a parallel color grid of the
+/// same shape. Every glyph mutation carries its color role, so the two layers
+/// can never desync. Width measurement and trimming always use the glyph layer.
+struct Canvas {
+    cells: Vec<Vec<String>>,
+    colors: Vec<Vec<Option<Color>>>,
+    width: usize,
+}
+
+impl Canvas {
+    fn new(width: usize, height: usize) -> Self {
+        let height = height.max(1);
+        Self {
+            cells: vec![vec![" ".to_string(); width]; height],
+            colors: vec![vec![None; width]; height],
+            width,
+        }
+    }
+
+    fn height(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Grow the canvas to at least `height` rows, keeping both layers in step.
+    fn resize(&mut self, height: usize) {
+        while self.cells.len() < height {
+            self.cells.push(vec![" ".to_string(); self.width]);
+            self.colors.push(vec![None; self.width]);
+        }
+    }
+
+    /// Set a cell's glyph and color together.
+    fn set(&mut self, y: usize, x: usize, glyph: &str, color: Option<Color>) {
+        if y < self.cells.len() && x < self.width {
+            self.cells[y][x] = glyph.to_string();
+            self.colors[y][x] = color;
+        }
+    }
 }
 
 /// Box drawing characters

@@ -2,9 +2,10 @@
 # Render every example in this directory so you can verify what meraid supports.
 #
 # Usage:
-#   examples/run-all.sh              # render all examples (text)
-#   examples/run-all.sh --ascii      # pass extra flags through to meraid
-#   examples/run-all.sh --theme neon
+#   examples/run-all.sh                       # render all examples (text)
+#   examples/run-all.sh --ascii               # pass extra flags through to meraid
+#   examples/run-all.sh --theme neon          # color (the script writes to your TTY)
+#   examples/run-all.sh --theme neon --color always | less -R
 set -euo pipefail
 
 # Prefer an installed `meraid`, fall back to a locally built release binary.
