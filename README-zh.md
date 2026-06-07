@@ -31,8 +31,8 @@
 - **ASCII 回退** — `--ascii` 兼容任何终端。
 - **管道友好 CLI** — `cat diagram.mmd | meraid` 即刻使用。
 - **CJK 对齐** — 基于 `unicode-width` 精确计算显示宽度，中日韩字符边框对齐无偏差。
-
-> 主题调色板已可通过 `--theme` 选择，但彩色 ANSI 输出列在 0.3 [路线图](#路线图)中 —— 当前输出为单色。
+- **彩色主题** — 通过 `--theme` 选择调色板；输出到终端时 meraid 会发出 ANSI 彩色
+  （truecolor 或 256 色），通过管道或重定向时保持纯文本。
 
 ## 为什么选择 meraid？
 
@@ -73,8 +73,11 @@ meraid diagram.mmd
 # 从 stdin 输入
 echo "graph LR; A-->B-->C" | meraid
 
-# 选择主题调色板
+# 选择主题调色板（输出到终端时显示彩色）
 meraid diagram.mmd --theme neon
+
+# 通过管道强制彩色，例如送入分页器
+meraid diagram.mmd --theme neon --color always | less -R
 
 # ASCII 纯文本输出
 meraid diagram.mmd --ascii
@@ -298,7 +301,8 @@ meraid examples/cjk-class.mmd
 |------|------|
 | `[INPUT]` | 输入文件路径，`-` 或省略表示从 stdin 读取 |
 | `--ascii` / `-a` | ASCII 纯文本边框（无 Unicode 线框字符） |
-| `--theme <主题>` | 主题调色板：`default` `terra` `neon` `mono` `amber` `phosphor`。彩色输出计划在 0.3 实现，当前为单色。 |
+| `--theme <主题>` | 主题调色板：`default` `terra` `neon` `mono` `amber` `phosphor`。`default` 沿用终端自身颜色，其余主题按角色重新着色。 |
+| `--color <时机>` | 何时输出 ANSI 彩色：`auto`（默认 —— 仅在终端）、`always`、`never`。遵循 `NO_COLOR`；`--color always` 可覆盖它。JSON 输出始终为无色。 |
 | `--format <格式>` | 输出格式：`text`（默认）或 `json` |
 | `--padding-x <N>` / `--padding-y <N>` | 预留的内边距选项（已接受参数，但尚未生效） |
 
@@ -315,7 +319,10 @@ meraid examples/cjk-class.mmd
 | `amber` | 琥珀色 CRT 风格 |
 | `phosphor` | 经典绿色荧光管终端 |
 
-> 彩色 ANSI 输出尚未接入 —— `--theme` 目前仅选择调色板，渲染结果为单色。彩色渲染是 0.3 路线图的首要项。
+彩色为**仅前景**，并按角色着色（节点文字、连线、连线标签、起止标记）。当终端
+通过 `COLORTERM=truecolor`/`24bit` 声明支持时输出 **truecolor**，否则回退到
+**256 色**。`default` 主题沿用终端自身颜色，无论是否启用彩色看起来都一致 ——
+要重新着色请选择其他主题。背景填充预留给后续版本。
 
 ## 路线图
 
@@ -328,7 +335,8 @@ meraid examples/cjk-class.mmd
 
 计划于 0.3 及之后：
 
-- [ ] 主题调色板的 ANSI **彩色**输出
+- [x] 主题调色板的 ANSI **彩色**输出（truecolor / 256 色，感知 TTY，`--color`
+  参数，遵循 `NO_COLOR`）
 - [ ] 节点形状**字形**（菱形、体育场、圆角……）
 - [ ] 方向感知布局（`TD`/`BT`/`RL`）
 - [ ] 虚线/粗线连线样式的差异化渲染

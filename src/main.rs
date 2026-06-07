@@ -2,7 +2,7 @@
 //! AI-friendly: designed for AI coding agents to use
 
 use clap::{Parser, ValueEnum, ValueHint};
-use meraid::{Diagram, DiagramType, Theme, ThemeType};
+use meraid::{ColorMode, Diagram, DiagramType, Theme, ThemeType};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, IsTerminal, Read};
@@ -37,6 +37,63 @@ struct Cli {
     /// Output format
     #[arg(long, default_value = "text", value_enum)]
     format: OutputFormat,
+
+    /// When to emit ANSI color: auto (TTY only), always, or never
+    #[arg(long, default_value = "auto", value_enum)]
+    color: ColorChoice,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ColorChoice {
+    Auto,
+    Always,
+    Never,
+}
+
+/// The environment inputs that gate color, separated from the decision so the
+/// policy can be unit-tested without touching real env/TTY.
+struct ColorEnv {
+    stdout_is_tty: bool,
+    no_color: bool,
+    term_dumb: bool,
+    truecolor: bool,
+}
+
+impl ColorEnv {
+    /// Gather the real environment.
+    fn detect() -> Self {
+        Self {
+            stdout_is_tty: io::stdout().is_terminal(),
+            no_color: std::env::var_os("NO_COLOR").is_some(),
+            term_dumb: std::env::var("TERM").map(|t| t == "dumb").unwrap_or(false),
+            truecolor: matches!(
+                std::env::var("COLORTERM").as_deref(),
+                Ok("truecolor") | Ok("24bit")
+            ),
+        }
+    }
+}
+
+/// Resolve the effective color mode. JSON output is always uncolored. `Always`
+/// forces color (overriding NO_COLOR); `Auto` requires a capable TTY. Depth is
+/// truecolor when `COLORTERM` advertises it, otherwise ANSI-256.
+fn decide_color_mode(choice: ColorChoice, json_mode: bool, env: &ColorEnv) -> ColorMode {
+    if json_mode {
+        return ColorMode::None;
+    }
+    let want_color = match choice {
+        ColorChoice::Never => false,
+        ColorChoice::Always => true,
+        ColorChoice::Auto => env.stdout_is_tty && !env.no_color && !env.term_dumb,
+    };
+    if !want_color {
+        return ColorMode::None;
+    }
+    if env.truecolor {
+        ColorMode::TrueColor
+    } else {
+        ColorMode::Ansi256
+    }
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -130,9 +187,11 @@ fn run() -> anyhow::Result<()> {
     // Build renderer
     let theme: ThemeType = cli.theme.into();
     let theme = Theme::get(theme);
+    let color_mode = decide_color_mode(cli.color, json_mode, &ColorEnv::detect());
     let renderer = meraid::Renderer::new(theme.clone())
         .ascii_only(cli.ascii)
-        .padding(cli.padding_x, cli.padding_y);
+        .padding(cli.padding_x, cli.padding_y)
+        .color_mode(color_mode);
 
     // Render
     match meraid::parse_mermaid(&source).map(|diagram| {
@@ -325,5 +384,87 @@ fn generate_suggestion(error: &str) -> Option<String> {
         Some("provide non-empty Mermaid diagram source".to_string())
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use meraid::ColorMode;
+
+    fn env(is_tty: bool, no_color: bool, term_dumb: bool, truecolor: bool) -> ColorEnv {
+        ColorEnv {
+            stdout_is_tty: is_tty,
+            no_color,
+            term_dumb,
+            truecolor,
+        }
+    }
+
+    #[test]
+    fn json_mode_is_always_uncolored() {
+        // Even --color=always with a truecolor TTY: JSON must stay clean.
+        let e = env(true, false, false, true);
+        assert_eq!(
+            decide_color_mode(ColorChoice::Always, true, &e),
+            ColorMode::None
+        );
+    }
+
+    #[test]
+    fn never_disables_color() {
+        let e = env(true, false, false, true);
+        assert_eq!(
+            decide_color_mode(ColorChoice::Never, false, &e),
+            ColorMode::None
+        );
+    }
+
+    #[test]
+    fn always_overrides_no_color_and_picks_depth() {
+        // Explicit --color=always beats NO_COLOR.
+        let truecolor = env(false, true, true, true);
+        assert_eq!(
+            decide_color_mode(ColorChoice::Always, false, &truecolor),
+            ColorMode::TrueColor
+        );
+        let only256 = env(false, true, true, false);
+        assert_eq!(
+            decide_color_mode(ColorChoice::Always, false, &only256),
+            ColorMode::Ansi256
+        );
+    }
+
+    #[test]
+    fn auto_emits_color_only_on_a_capable_tty() {
+        // Happy path: TTY, no NO_COLOR, not dumb, truecolor advertised.
+        assert_eq!(
+            decide_color_mode(ColorChoice::Auto, false, &env(true, false, false, true)),
+            ColorMode::TrueColor
+        );
+        // TTY but no truecolor → 256.
+        assert_eq!(
+            decide_color_mode(ColorChoice::Auto, false, &env(true, false, false, false)),
+            ColorMode::Ansi256
+        );
+    }
+
+    #[test]
+    fn auto_is_silent_when_piped_or_suppressed() {
+        // Not a TTY (piped / redirected).
+        assert_eq!(
+            decide_color_mode(ColorChoice::Auto, false, &env(false, false, false, true)),
+            ColorMode::None
+        );
+        // NO_COLOR set.
+        assert_eq!(
+            decide_color_mode(ColorChoice::Auto, false, &env(true, true, false, true)),
+            ColorMode::None
+        );
+        // TERM=dumb.
+        assert_eq!(
+            decide_color_mode(ColorChoice::Auto, false, &env(true, false, true, true)),
+            ColorMode::None
+        );
     }
 }

@@ -2,7 +2,10 @@
 
 Every file here is a real, runnable Mermaid diagram. The output blocks below are
 **copied verbatim from the binary** — what you see is exactly what `meraid`
-prints today (v0.2). Nothing here is aspirational.
+prints today. Nothing here is aspirational.
+
+> The captured blocks are plain text, so they're monochrome. On a real terminal
+> `meraid` also emits ANSI **color** when you pick a theme — see [Color](#color).
 
 ## Run them
 
@@ -16,7 +19,8 @@ cargo build --release
 # render every example in one go (passes extra flags through)
 examples/run-all.sh
 examples/run-all.sh --ascii
-examples/run-all.sh --theme neon
+examples/run-all.sh --theme neon          # color, since the script writes to your TTY
+examples/run-all.sh --theme neon --color always | less -R   # color through a pager
 ```
 
 If you've installed meraid (`cargo install meraid`), drop the `./target/release/`
@@ -243,7 +247,8 @@ meraid examples/cjk-sequence.mmd
 | Flag | What it does |
 | --- | --- |
 | `--ascii` / `-a` | Use only ASCII box-drawing (`+ - \| -->`) — great for logs, CI, and terminals without Unicode box glyphs. |
-| `--theme <name>` | `default`, `terra`, `neon`, `mono`, `amber`, `phosphor`. Affects ANSI colors when writing to a TTY. |
+| `--theme <name>` | `default`, `terra`, `neon`, `mono`, `amber`, `phosphor`. `default` keeps your terminal's colors; the others recolor by role (truecolor or 256-color). |
+| `--color <when>` | `auto` (default — color only on a TTY), `always`, or `never`. Honors `NO_COLOR`; `--color always` overrides it. JSON is always uncolored. |
 | `--format json` | Emit a structured JSON envelope (`success`, `diagram`, `error`, `metadata`) instead of plain text — designed for AI agents and tooling. |
 | `--padding-x` / `--padding-y` | Tune the whitespace inside boxes. |
 
@@ -259,6 +264,36 @@ meraid examples/01-flowchart.mmd --ascii
 |          |    |          |    |          |    |          |
 +----------+    +----------+    +----------+    +----------+
 ```
+
+### Color
+
+Markdown can't show ANSI color, so the blocks above are monochrome. To see color
+for real, just run an example with a theme in your terminal:
+
+```sh
+meraid examples/02-flowchart-branch.mmd --theme neon
+```
+
+Color is **opt-in by theme** and **TTY-aware**: with the default `--color auto`
+you get color only when writing to a terminal, so piping or redirecting stays
+clean. Force it on when you need color through a pager or into a file:
+
+```sh
+meraid examples/02-flowchart-branch.mmd --theme neon --color always | less -R
+```
+
+Coloring is by **role** — node text, edge wires/arrows, edge labels, and
+start/end markers each get the theme's color. To inspect the raw escapes, pipe
+through `cat -v`. For the `yes` branch of a flowchart, neon emits (escapes shown
+as `\e`):
+
+```
+\e[38;2;0;255;127m┌\e[0m\e[38;2;0;255;255myes\e[0m\e[38;2;0;255;127m──▶\e[0m
+└ junction (edge)      └ label (edge_label)   └ arrow (edge)
+```
+
+The `default` theme is special: it inherits your terminal's own colors and emits
+no escapes, so `--theme default` looks identical whether or not color is on.
 
 ### `--format json` example
 
